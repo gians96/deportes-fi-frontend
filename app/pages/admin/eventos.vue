@@ -620,7 +620,8 @@ async function loadTokens() {
       tokensError.value = apiErrorMessage(err, 'No se pudieron cargar los tokens')
     }
   } finally {
-    tokensLoading.value = false
+    // Una respuesta tardía de otro evento no apaga la carga del evento actual.
+    if (tokensEvent.value?.id === eventId) tokensLoading.value = false
   }
 }
 
@@ -637,16 +638,19 @@ async function createToken() {
     tokenFormError.value = 'La fecha de expiración no puede ser anterior a hoy'
     return
   }
+  const expiresAt = tokenForm.expiresOn
+    ? endOfLocalDayIso(tokenForm.expiresOn)
+    : undefined
+  // Una fecha ilegible nunca debe convertirse en un token sin expiración.
+  if (tokenForm.expiresOn && !expiresAt) {
+    tokenFormError.value = 'La fecha de expiración no es válida'
+    return
+  }
   tokenCreating.value = true
   try {
     const created = await api.post<CreatedEventApiToken>(
       `/events/${eventId}/api-tokens`,
-      {
-        name,
-        expiresAt: tokenForm.expiresOn
-          ? endOfLocalDayIso(tokenForm.expiresOn)
-          : undefined,
-      },
+      { name, expiresAt },
     )
     // Si el modal se cerró o cambió de evento, no se muestra fuera de contexto.
     if (!tokensOpen.value || tokensEvent.value?.id !== eventId) return
