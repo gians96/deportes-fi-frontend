@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-29
 
-**Status**: Aprobada (lista para implementar)
+**Status**: Implementada (2026-09-29)
 
 **Input**: "En el panel de eventos, una acción 'Tokens API' por evento para crear (con
 expiración opcional), listar y revocar los tokens de integración que usa el sistema del congreso;
