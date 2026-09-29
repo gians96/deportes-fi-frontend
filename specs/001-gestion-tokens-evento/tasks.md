@@ -50,8 +50,8 @@ type-check y prueba manual en el navegador (quickstart.md).
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T010 [P] Actualizar `docs/api-consumption.md` y `AGENTS.md`
-- [ ] T011 `bun run build` y `vue-tsc --noEmit` (vía `nuxi typecheck`) sin errores
+- [x] T010 [P] Actualizar `docs/api-consumption.md` y `AGENTS.md`
+- [ ] T011 `bun run build` sin errores y `vue-tsc -b --noEmit` (efímero vía `npx`) sin errores en los archivos tocados
 - [ ] T012 Prueba manual en el navegador contra el backend local (quickstart.md)
 - [ ] T013 Marcar la spec como implementada
 

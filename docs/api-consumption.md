@@ -72,7 +72,7 @@ await api.upload('/registrations', fd)
 | `inscripcion/[id].vue` | `GET /disciplines/:id`, `GET /academic/student` o `GET /academic/dni` (según `participantType`), `POST /registrations` |
 | `estado-inscripcion.vue` | `GET /registrations/mine` |
 | `admin/facultades.vue` | `GET/POST/PATCH/DELETE /faculties` y `/schools` |
-| `admin/eventos.vue` | `GET/POST/PATCH/DELETE /events` |
+| `admin/eventos.vue` | `GET/POST/PATCH/DELETE /events`; modal "Tokens API" por evento: `GET/POST /events/:eventId/api-tokens` y `DELETE /events/:eventId/api-tokens/:id` (revocar). El `token` en claro de la respuesta de creación se muestra una sola vez y no se persiste |
 | `admin/disciplinas/index.vue` | `GET/POST/PATCH/DELETE /disciplines` (con filtros), cierre con `datetime-local`, puntaje configurable, muestra `teamsCount`; para `REFEREE` queda solo lectura con acceso a fixture |
 | `admin/disciplinas/[id]/fixture.vue` | `GET /disciplines/:id/fixture`, `POST /disciplines/:id/fixture/generate` (solo admin), `PATCH /matches/:id`, `PATCH /matches/:id/result` con autosave, `POST /disciplines/:id/standings/recalculate` (solo admin) |
 | `admin/inscripciones.vue` | `GET /registrations` con filtros (`status`, `eventId`, `disciplineId`, `isPaid`, `participantType`) y `phone` del equipo/delegado, `POST /registrations`, `PATCH /registrations/:id/approve\|reject`, `PATCH /vouchers/:id/validate`, `GET /disciplines`, `GET /academic/student` o `GET /academic/dni` (según `participantType`) |

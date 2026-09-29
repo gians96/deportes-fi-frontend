@@ -50,6 +50,9 @@ en [`docs/`](./docs/README.md).
 - En el panel admin, respetar permisos: `admin.ts` exige rol OWNER/ADMIN; en
   usuarios, un admin no edita admins/owners y nadie se inhabilita a sí mismo.
 - Disciplinas pagadas (`isPaid`) requieren voucher en la inscripción.
+- Tokens de integración por evento (`admin/eventos.vue` → "Tokens API"): el
+  valor completo `dfi_…` solo se muestra una vez tras crearlo; nunca guardarlo
+  en cookies, `localStorage`, stores ni consola.
 - En `admin/inscripciones.vue`, mostrar siempre `team.phone` como teléfono de
   contacto del equipo/delegado; si falta, usar un texto discreto.
 

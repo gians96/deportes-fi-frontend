@@ -22,8 +22,9 @@ dependencias nuevas.
 **Storage**: ninguno en el cliente (el token en claro vive solo en un `ref` mientras se muestra).
 
 **Testing**: el repo no tiene pruebas de frontend; verificación con `bun run build`,
-`vue-tsc --noEmit` (vía `nuxi typecheck`) y prueba manual en el navegador contra el backend
-local (`http://localhost:3030/api/v1`).
+`vue-tsc -b --noEmit` ejecutado de forma efímera con `npx -p vue-tsc -p typescript` (el repo no
+trae `vue-tsc` y `nuxi typecheck` bajo Bun lo instalaría de forma global) y prueba manual en el
+navegador contra el backend local (`http://localhost:3030/api/v1`).
 
 **Target Platform**: navegadores modernos (panel admin, escritorio y móvil).
 
