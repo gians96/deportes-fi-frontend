@@ -23,28 +23,28 @@ type-check y prueba manual en el navegador (quickstart.md).
 
 ## Phase 2: Foundational
 
-- [ ] T003 [P] Agregar `EventApiTokenStatus`, `EventApiToken` y `CreatedEventApiToken` en `app/types/domain.ts`
+- [x] T003 [P] Agregar `EventApiTokenStatus`, `EventApiToken` y `CreatedEventApiToken` en `app/types/domain.ts`
 
 ---
 
 ## Phase 3: User Story 2 - Ver tokens y estado (P1)
 
-- [ ] T004 [US2] Acción "Tokens API" por evento y `AppModal` con carga de `GET /events/:id/api-tokens` en `app/pages/admin/eventos.vue`
-- [ ] T005 [US2] Tabla con nombre, prefijo, creado, último uso, vence y estado (badges Activo/Revocado/Expirado), estado vacío y error con reintento
+- [x] T004 [US2] Acción "Tokens API" por evento y `AppModal` con carga de `GET /events/:id/api-tokens` en `app/pages/admin/eventos.vue`
+- [x] T005 [US2] Tabla con nombre, prefijo, creado, último uso, vence y estado (badges Activo/Revocado/Expirado), estado vacío y error con reintento
 
 ---
 
 ## Phase 4: User Story 1 - Crear y copiar una sola vez (P1) 🎯 MVP
 
-- [ ] T006 [US1] Formulario (nombre ≤ 100, fecha opcional con mínimo hoy → fin del día local en ISO) con `POST /events/:id/api-tokens`
-- [ ] T007 [US1] Aviso de un solo uso: token en campo de solo lectura, botón "Copiar" con respaldo manual, advertencia "Cópialo ahora, no se volverá a mostrar." y "Ya lo guardé"
-- [ ] T008 [US1] Borrar el token en claro al descartar, al cerrar el modal y al cambiar de evento (sin storage ni logs)
+- [x] T006 [US1] Formulario (nombre ≤ 100, fecha opcional con mínimo hoy → fin del día local en ISO) con `POST /events/:id/api-tokens`
+- [x] T007 [US1] Aviso de un solo uso: token en campo de solo lectura, botón "Copiar" con respaldo manual, advertencia "Cópialo ahora, no se volverá a mostrar." y "Ya lo guardé"
+- [x] T008 [US1] Borrar el token en claro al descartar, al cerrar el modal y al cambiar de evento (sin storage ni logs)
 
 ---
 
 ## Phase 5: User Story 3 - Revocar con confirmación (P2)
 
-- [ ] T009 [US3] `AppConfirm` de revocación con `DELETE /events/:id/api-tokens/:tokenId` y actualización de la fila
+- [x] T009 [US3] `AppConfirm` de revocación con `DELETE /events/:id/api-tokens/:tokenId` y actualización de la fila
 
 ---
 

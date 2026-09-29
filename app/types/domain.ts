@@ -65,6 +65,33 @@ export interface SportEvent {
   disciplinesCount?: number
 }
 
+/** Estado calculado por el backend; `REVOKED` prevalece sobre `EXPIRED`. */
+export type EventApiTokenStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
+
+/** Token de integración de un evento (nunca incluye el valor completo). */
+export interface EventApiToken {
+  id: number
+  eventId: number
+  name: string
+  tokenPrefix: string
+  createdById?: number | null
+  lastUsedAt: string | null
+  expiresAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  status: EventApiTokenStatus
+}
+
+/** Respuesta de creación: único momento en que llega `token` en claro. */
+export interface CreatedEventApiToken {
+  id: number
+  name: string
+  tokenPrefix: string
+  expiresAt: string | null
+  createdAt: string
+  token: string
+}
+
 export interface Discipline {
   id: number
   eventId: number

@@ -65,7 +65,7 @@
       <div
         v-for="event in events"
         :key="event.id"
-        class="flex items-center justify-between rounded-xl border border-oscuro-700 bg-oscuro-850 p-4"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-oscuro-700 bg-oscuro-850 p-4"
       >
         <div>
           <p class="font-semibold text-white">{{ event.name }}</p>
@@ -73,7 +73,7 @@
             {{ formatDateUtc(event.startDate) }} — {{ formatDateUtc(event.endDate) }}
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <span
             class="rounded-full px-2.5 py-1 text-xs font-semibold"
             :class="
@@ -84,6 +84,13 @@
           >
             {{ event.isOpen ? 'Abierto' : 'Cerrado' }}
           </span>
+          <button
+            class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/10"
+            @click="openTokens(event)"
+          >
+            <KeyRound class="h-3.5 w-3.5" />
+            Tokens API
+          </button>
           <button
             class="rounded-lg px-3 py-1.5 text-xs font-semibold text-sky-300 hover:bg-sky-500/10"
             @click="openEdit(event)"
@@ -165,12 +172,205 @@
       :error="modalError"
       @confirm="runDelete"
     />
+
+    <!-- Tokens API del evento (integración con el congreso) -->
+    <AppModal
+      v-model="tokensOpen"
+      :title="`Tokens API · ${tokensEvent?.name ?? ''}`"
+      size="4xl"
+    >
+      <div class="space-y-5">
+        <p class="text-sm text-oscuro-300">
+          Los tokens permiten que el sistema del congreso consulte, de servidor a
+          servidor, las inscripciones y pagos de <strong class="text-white">este
+          evento</strong>. Configúralos solo en el servidor que los usa y revócalos si
+          se filtran.
+        </p>
+
+        <!-- Token recién creado: se muestra una sola vez -->
+        <div
+          v-if="createdToken"
+          class="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4"
+        >
+          <div class="flex items-start gap-3">
+            <AlertTriangle class="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div class="min-w-0 flex-1">
+              <p class="font-bold text-amber-300">
+                Token "{{ createdToken.name }}" creado
+              </p>
+              <p class="mt-1 text-sm text-amber-100/90">
+                Cópialo ahora, no se volverá a mostrar.
+              </p>
+              <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+                <input
+                  ref="createdTokenInput"
+                  :value="createdToken.token"
+                  readonly
+                  aria-label="Token de integración"
+                  class="input font-mono text-sm"
+                  @focus="selectCreatedToken"
+                />
+                <button
+                  type="button"
+                  class="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-oscuro-900 hover:bg-amber-300"
+                  @click="copyToken"
+                >
+                  <Check v-if="copyState === 'copied'" class="h-4 w-4" />
+                  <Copy v-else class="h-4 w-4" />
+                  {{ copyState === 'copied' ? 'Copiado' : 'Copiar' }}
+                </button>
+              </div>
+              <p v-if="copyState === 'manual'" class="mt-2 text-xs text-amber-200">
+                No se pudo copiar automáticamente: el token está seleccionado, cópialo
+                con Ctrl+C.
+              </p>
+              <button
+                type="button"
+                class="mt-3 text-sm font-semibold text-oscuro-200 hover:text-white"
+                @click="dismissCreatedToken"
+              >
+                Ya lo guardé
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Crear token -->
+        <form
+          class="grid gap-3 rounded-xl border border-oscuro-700 bg-oscuro-900/40 p-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-end"
+          @submit.prevent="createToken"
+        >
+          <label class="block">
+            <span class="text-sm text-oscuro-200">Nombre</span>
+            <input
+              v-model="tokenForm.name"
+              required
+              maxlength="100"
+              placeholder="Ej. Congreso CIISIC 2026"
+              class="input"
+            />
+          </label>
+          <label class="block">
+            <span class="text-sm text-oscuro-200">Vence (opcional)</span>
+            <input
+              v-model="tokenForm.expiresOn"
+              type="date"
+              :min="todayInput"
+              class="input"
+            />
+          </label>
+          <button
+            type="submit"
+            :disabled="tokenCreating"
+            class="flex items-center justify-center gap-2 rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-60"
+          >
+            <KeyRound class="h-4 w-4" />
+            {{ tokenCreating ? 'Creando…' : 'Crear token' }}
+          </button>
+          <p v-if="tokenFormError" class="text-sm text-red-400 sm:col-span-3">
+            {{ tokenFormError }}
+          </p>
+        </form>
+
+        <!-- Lista de tokens -->
+        <div>
+          <p v-if="tokensLoading" class="py-6 text-center text-sm text-oscuro-300">
+            Cargando tokens…
+          </p>
+          <div
+            v-else-if="tokensError"
+            class="flex items-center justify-between gap-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-300"
+          >
+            <span>{{ tokensError }}</span>
+            <button
+              type="button"
+              class="font-semibold underline hover:text-red-200"
+              @click="loadTokens"
+            >
+              Reintentar
+            </button>
+          </div>
+          <p
+            v-else-if="!tokens.length"
+            class="rounded-lg border border-dashed border-oscuro-700 p-6 text-center text-sm text-oscuro-300"
+          >
+            Este evento aún no tiene tokens. Crea el primero con el formulario.
+          </p>
+          <div v-else class="overflow-x-auto rounded-xl border border-oscuro-700">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-oscuro-800 text-oscuro-300">
+                <tr>
+                  <th class="px-4 py-3">Nombre</th>
+                  <th class="px-4 py-3">Prefijo</th>
+                  <th class="px-4 py-3">Creado</th>
+                  <th class="px-4 py-3">Último uso</th>
+                  <th class="px-4 py-3">Vence</th>
+                  <th class="px-4 py-3">Estado</th>
+                  <th class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-oscuro-700 bg-oscuro-850">
+                <tr v-for="token in tokens" :key="token.id">
+                  <td class="px-4 py-3 font-semibold text-white">{{ token.name }}</td>
+                  <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-oscuro-200">
+                    {{ token.tokenPrefix }}…
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-3 text-oscuro-300">
+                    {{ formatDateTime(token.createdAt) }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-3 text-oscuro-300">
+                    {{ token.lastUsedAt ? formatDateTime(token.lastUsedAt) : 'Nunca' }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-3 text-oscuro-300">
+                    {{ token.expiresAt ? formatDateTime(token.expiresAt) : 'Sin expiración' }}
+                  </td>
+                  <td class="px-4 py-3">
+                    <span
+                      class="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold"
+                      :class="tokenStatusClass[token.status]"
+                    >
+                      {{ tokenStatusLabel[token.status] }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <button
+                      v-if="token.status !== 'REVOKED'"
+                      class="text-sm font-semibold text-red-400 hover:text-red-300"
+                      @click="askRevoke(token)"
+                    >
+                      Revocar
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </AppModal>
+
+    <!-- Confirmación de revocación (después del modal para quedar encima) -->
+    <AppConfirm
+      v-model="revokeOpen"
+      title="Revocar token"
+      :message="revokeMessage"
+      confirm-text="Revocar"
+      :loading="revokeLoading"
+      :error="revokeError"
+      @confirm="runRevoke"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import type { SportEvent } from '~/types/domain'
-import { formatDateUtc } from '~/utils/format'
+import { AlertTriangle, Check, Copy, KeyRound } from 'lucide-vue-next'
+import type {
+  CreatedEventApiToken,
+  EventApiToken,
+  EventApiTokenStatus,
+  SportEvent,
+} from '~/types/domain'
+import { formatDateTime, formatDateUtc } from '~/utils/format'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
@@ -343,6 +543,185 @@ async function create() {
     error.value =
       (err as { data?: { message?: string | string[] } })?.data?.message?.toString() ??
       'No se pudo crear el evento'
+  }
+}
+
+// --- Tokens API del evento (integración con el congreso) ---
+// El token en claro solo vive en `createdToken` mientras se muestra: nunca se
+// guarda en cookies, storage ni stores, y se borra al descartarlo o cerrar.
+const tokensOpen = ref(false)
+const tokensEvent = ref<SportEvent | null>(null)
+const tokens = ref<EventApiToken[]>([])
+const tokensLoading = ref(false)
+const tokensError = ref('')
+const tokenForm = reactive({ name: '', expiresOn: '' })
+const tokenCreating = ref(false)
+const tokenFormError = ref('')
+const createdToken = ref<CreatedEventApiToken | null>(null)
+const createdTokenInput = ref<HTMLInputElement | null>(null)
+const copyState = ref<'idle' | 'copied' | 'manual'>('idle')
+
+const tokenStatusLabel: Record<EventApiTokenStatus, string> = {
+  ACTIVE: 'Activo',
+  REVOKED: 'Revocado',
+  EXPIRED: 'Expirado',
+}
+const tokenStatusClass: Record<EventApiTokenStatus, string> = {
+  ACTIVE: 'bg-green-500/10 text-green-300',
+  REVOKED: 'bg-red-500/10 text-red-300',
+  EXPIRED: 'bg-oscuro-700 text-oscuro-300',
+}
+
+function apiErrorMessage(err: unknown, fallback: string) {
+  const message = (err as { data?: { message?: string | string[] } })?.data?.message
+  if (Array.isArray(message)) return message.join('. ')
+  return message || fallback
+}
+
+function toLocalDateInput(date: Date) {
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+const todayInput = computed(() => toLocalDateInput(new Date()))
+
+/** Fin del día elegido en hora local, en ISO (lo que espera el backend). */
+function endOfLocalDayIso(value: string) {
+  const date = new Date(`${value}T23:59:59.999`)
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
+}
+
+function forgetCreatedToken() {
+  createdToken.value = null
+  copyState.value = 'idle'
+}
+
+function openTokens(event: SportEvent) {
+  forgetCreatedToken()
+  tokensEvent.value = event
+  tokens.value = []
+  tokensError.value = ''
+  tokenFormError.value = ''
+  Object.assign(tokenForm, { name: '', expiresOn: '' })
+  tokensOpen.value = true
+  void loadTokens()
+}
+
+async function loadTokens() {
+  const eventId = tokensEvent.value?.id
+  if (!eventId) return
+  tokensLoading.value = true
+  tokensError.value = ''
+  try {
+    const list = await api.get<EventApiToken[]>(`/events/${eventId}/api-tokens`)
+    if (tokensEvent.value?.id === eventId) tokens.value = list
+  } catch (err) {
+    if (tokensEvent.value?.id === eventId) {
+      tokensError.value = apiErrorMessage(err, 'No se pudieron cargar los tokens')
+    }
+  } finally {
+    tokensLoading.value = false
+  }
+}
+
+async function createToken() {
+  const eventId = tokensEvent.value?.id
+  if (!eventId || tokenCreating.value) return
+  tokenFormError.value = ''
+  const name = tokenForm.name.trim()
+  if (!name) {
+    tokenFormError.value = 'Escribe un nombre para el token'
+    return
+  }
+  if (tokenForm.expiresOn && tokenForm.expiresOn < todayInput.value) {
+    tokenFormError.value = 'La fecha de expiración no puede ser anterior a hoy'
+    return
+  }
+  tokenCreating.value = true
+  try {
+    const created = await api.post<CreatedEventApiToken>(
+      `/events/${eventId}/api-tokens`,
+      {
+        name,
+        expiresAt: tokenForm.expiresOn
+          ? endOfLocalDayIso(tokenForm.expiresOn)
+          : undefined,
+      },
+    )
+    // Si el modal se cerró o cambió de evento, no se muestra fuera de contexto.
+    if (!tokensOpen.value || tokensEvent.value?.id !== eventId) return
+    createdToken.value = created
+    copyState.value = 'idle'
+    Object.assign(tokenForm, { name: '', expiresOn: '' })
+    await loadTokens()
+  } catch (err) {
+    tokenFormError.value = apiErrorMessage(err, 'No se pudo crear el token')
+  } finally {
+    tokenCreating.value = false
+  }
+}
+
+function selectCreatedToken() {
+  createdTokenInput.value?.select()
+}
+
+async function copyToken() {
+  if (!createdToken.value) return
+  try {
+    await navigator.clipboard.writeText(createdToken.value.token)
+    copyState.value = 'copied'
+  } catch {
+    // Sin API de portapapeles (contexto no seguro o permiso denegado).
+    selectCreatedToken()
+    copyState.value = document.execCommand?.('copy') ? 'copied' : 'manual'
+  }
+}
+
+function dismissCreatedToken() {
+  forgetCreatedToken()
+}
+
+watch(tokensOpen, (open) => {
+  if (!open) forgetCreatedToken()
+})
+
+// --- Revocar token ---
+const revokeOpen = ref(false)
+const revokeLoading = ref(false)
+const revokeError = ref('')
+const revokeTarget = ref<EventApiToken | null>(null)
+
+const revokeMessage = computed(() =>
+  revokeTarget.value
+    ? `¿Revocar el token "${revokeTarget.value.name}" (${revokeTarget.value.tokenPrefix}…)? Las integraciones que lo usen dejarán de funcionar de inmediato. Esta acción no se puede deshacer.`
+    : '',
+)
+
+function askRevoke(token: EventApiToken) {
+  revokeTarget.value = token
+  revokeError.value = ''
+  revokeOpen.value = true
+}
+
+async function runRevoke() {
+  const target = revokeTarget.value
+  const eventId = tokensEvent.value?.id
+  if (!target || !eventId) return
+  revokeLoading.value = true
+  revokeError.value = ''
+  try {
+    const updated = await api.del<EventApiToken>(
+      `/events/${eventId}/api-tokens/${target.id}`,
+    )
+    tokens.value = tokens.value.map((token) =>
+      token.id === updated.id ? updated : token,
+    )
+    revokeOpen.value = false
+    revokeTarget.value = null
+  } catch (err) {
+    revokeError.value = apiErrorMessage(err, 'No se pudo revocar el token')
+  } finally {
+    revokeLoading.value = false
   }
 }
 
