@@ -32,6 +32,11 @@ const map: Record<string, { label: string; classes: string; dot: string }> = {
     classes: 'bg-red-500/10 text-red-300 border border-red-500/20',
     dot: 'bg-red-400',
   },
+  DRAFT: {
+    label: 'Borrador',
+    classes: 'bg-sky-500/10 text-sky-300 border border-sky-500/20',
+    dot: 'bg-sky-400',
+  },
   CANCELLED: {
     label: 'Cancelado',
     classes: 'bg-oscuro-600/40 text-oscuro-200 border border-oscuro-600',

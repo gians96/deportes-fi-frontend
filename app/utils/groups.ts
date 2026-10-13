@@ -26,6 +26,17 @@ export function slotLabel(slot: number | null | undefined): string {
   return slot === 1 ? 'Incluido' : 'Adicional'
 }
 
+/**
+ * Un grupo está activo si su pago general no fue rechazado o si todavía tiene equipos pendientes o
+ * aprobados (mismo criterio que el servidor). Un estudiante solo puede tener un grupo activo por evento.
+ */
+export function isActiveGroup(group: Pick<ClassGroup, 'baseVoucher' | 'disciplines'>): boolean {
+  if (group.baseVoucher?.status !== 'REJECTED') return true
+  return group.disciplines.some((discipline) =>
+    discipline.teams.some((team) => team.status === 'PENDING' || team.status === 'APPROVED'),
+  )
+}
+
 /** Equipos vigentes (con cupo) de un grupo en una disciplina. */
 export function activeTeams(group: ClassGroup, disciplineId: number): GroupTeam[] {
   const discipline = group.disciplines.find((d) => d.disciplineId === disciplineId)

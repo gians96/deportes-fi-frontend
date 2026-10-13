@@ -103,6 +103,10 @@
             <p class="text-lg font-bold text-yellow-300">{{ teamCount(group, 'PENDING') }}</p>
             pendientes
           </div>
+          <div v-if="teamCount(group, 'DRAFT')">
+            <p class="text-lg font-bold text-sky-300">{{ teamCount(group, 'DRAFT') }}</p>
+            borradores
+          </div>
         </div>
       </div>
 
@@ -122,14 +126,7 @@
           <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <span class="font-semibold text-green-400">{{ formatCurrency(entry.voucher.amount) }}</span>
             <span class="text-oscuro-300">Operación: {{ entry.voucher.operationNumber || '—' }}</span>
-            <a
-              :href="uploadUrl(config.public.apiBase, entry.voucher.imageUrl)"
-              target="_blank"
-              rel="noopener"
-              class="inline-flex items-center gap-1.5 font-semibold text-sky-300 hover:text-sky-200"
-            >
-              <ReceiptText class="h-4 w-4" /> Ver comprobante
-            </a>
+            <VoucherLink :voucher="entry.voucher" :title="entry.title" />
           </div>
           <p
             v-if="entry.voucher.status === 'REJECTED' && entry.voucher.rejectionReason"
@@ -142,7 +139,8 @@
             <template v-if="entry.voucher.status === 'PENDING'">
               <button
                 class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-60"
-                :disabled="busy"
+                :disabled="busy || !entry.submitted"
+                :title="entry.submitted ? undefined : 'El delegado aún no envió ningún equipo'"
                 @click="validateVoucher(group, entry.voucher.id)"
               >
                 {{ entry.voucher.kind === 'BASE' ? 'Validar pago y aprobar equipos' : 'Validar y aprobar equipo' }}
@@ -158,13 +156,19 @@
             <button
               v-else-if="entry.voucher.status === 'VALIDATED'"
               class="rounded-lg bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-60"
-              :disabled="busy"
+              :disabled="busy || !entry.submitted"
               @click="validateVoucher(group, entry.voucher.id)"
             >
               Aprobar equipos pendientes
             </button>
             <p v-else class="text-xs text-oscuro-400">
               Esperando que el delegado reenvíe el comprobante.
+            </p>
+            <p
+              v-if="entry.voucher.status === 'PENDING' && !entry.submitted"
+              class="self-center text-xs text-sky-300"
+            >
+              Esperando que el delegado envíe al menos un equipo.
             </p>
           </div>
         </div>
@@ -205,7 +209,11 @@
         </li>
       </ul>
       <p v-if="!teamCount(group)" class="mt-2 text-xs text-oscuro-400">
-        Todavía no registra equipos: el pago base no se puede validar hasta que haya al menos uno.
+        {{
+          teamCount(group, 'DRAFT')
+            ? 'Solo tiene borradores sin enviar: el pago base se puede validar cuando el delegado envíe al menos un equipo.'
+            : 'Todavía no registra equipos: el pago base no se puede validar hasta que haya al menos uno.'
+        }}
       </p>
     </section>
 
@@ -245,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ReceiptText, RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
 import type {
   ClassGroup,
   GroupTeam,
@@ -256,14 +264,13 @@ import type {
   VoucherStatus,
 } from '~/types/domain'
 import { formatCurrency } from '~/utils/format'
-import { apiMessage, scopeLabel, slotLabel, uploadUrl } from '~/utils/groups'
+import { apiMessage, scopeLabel, slotLabel } from '~/utils/groups'
 import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const api = useApi()
 const auth = useAuthStore()
-const config = useRuntimeConfig()
 
 const events = ref<SportEvent[]>([])
 const groups = ref<ClassGroup[]>([])
@@ -304,33 +311,38 @@ const filteredGroups = computed(() => {
   })
 })
 
+/** Sin `status` cuenta los equipos enviados (los borradores se cuentan aparte). */
 function teamCount(group: ClassGroup, status?: RegistrationStatus) {
   return group.disciplines
     .flatMap((discipline) => discipline.teams)
-    .filter((team) => !status || team.status === status).length
+    .filter((team) => (status ? team.status === status : team.status !== 'DRAFT')).length
 }
 
 /** Pago general y comprobantes adicionales del grupo, con una descripción de lo que cubren. */
-function vouchersOf(group: ClassGroup): { voucher: GroupVoucher; title: string; covers: string }[] {
-  const names = new Map(
-    group.disciplines.flatMap((d) => d.teams.map((t) => [t.id, `${t.name} (${d.name})`] as const)),
-  )
-  const entries: { voucher: GroupVoucher; title: string; covers: string }[] = []
+function vouchersOf(
+  group: ClassGroup,
+): { voucher: GroupVoucher; title: string; covers: string; submitted: number }[] {
+  const teams = group.disciplines.flatMap((d) => d.teams.map((t) => ({ team: t, discipline: d.name })))
+  const label = (item: { team: GroupTeam; discipline: string }) =>
+    `${item.team.name} (${item.discipline}${item.team.status === 'DRAFT' ? ', borrador' : ''})`
+  const entries: { voucher: GroupVoucher; title: string; covers: string; submitted: number }[] = []
   if (group.baseVoucher) {
-    const covered = group.disciplines.flatMap((d) =>
-      d.teams.filter((t) => t.voucherId === group.baseVoucher?.id).map((t) => `${t.name} (${d.name})`),
-    )
+    const covered = teams.filter((item) => item.team.voucherId === group.baseVoucher?.id)
     entries.push({
       voucher: group.baseVoucher,
       title: 'Pago general',
-      covers: covered.length ? `Cubre: ${covered.join(', ')}` : 'Todavía no cubre ningún equipo',
+      covers: covered.length ? `Cubre: ${covered.map(label).join(', ')}` : 'Todavía no cubre ningún equipo',
+      // Un comprobante solo se puede validar cuando cubre al menos un equipo ya enviado (no borrador).
+      submitted: covered.filter((item) => item.team.status !== 'DRAFT').length,
     })
   }
   for (const extra of group.extraVouchers) {
+    const covered = teams.filter((item) => extra.teamIds.includes(item.team.id))
     entries.push({
       voucher: extra,
       title: 'Equipo adicional',
-      covers: `Cubre: ${extra.teamIds.map((id) => names.get(id) ?? `#${id}`).join(', ') || '—'}`,
+      covers: `Cubre: ${covered.map(label).join(', ') || '—'}`,
+      submitted: covered.filter((item) => item.team.status !== 'DRAFT').length,
     })
   }
   return entries

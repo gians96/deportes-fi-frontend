@@ -246,7 +246,17 @@
                 {{ reviewTeam.discipline?.name || reviewTeam.disciplineName || 'Disciplina' }}
               </p>
             </div>
-            <StatusBadge :status="reviewTeam.status" />
+            <div class="flex flex-col items-end gap-2">
+              <StatusBadge :status="reviewTeam.status" />
+              <button
+                v-if="auth.isAdmin && reviewTeam.status !== 'CANCELLED'"
+                type="button"
+                class="rounded-lg bg-oscuro-700/60 px-3 py-1.5 text-xs font-semibold text-oscuro-100 hover:bg-oscuro-700"
+                @click="editOpen = true"
+              >
+                Editar equipo
+              </button>
+            </div>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-3">
@@ -354,6 +364,9 @@
                   alt="voucher"
                   class="max-h-80 w-full object-contain"
                 />
+              </div>
+              <div v-if="reviewTeam.voucher.imageUrl" class="mt-2">
+                <VoucherLink :voucher="reviewTeam.voucher" label="Ampliar comprobante" />
               </div>
 
               <p
@@ -608,6 +621,8 @@
         </button>
       </form>
     </AppModal>
+
+    <AdminTeamEditModal v-model="editOpen" :team="reviewTeam" @saved="onTeamEdited" />
   </div>
 </template>
 
@@ -687,12 +702,14 @@ watch(paymentFilter, () => {
   loadTeams()
 })
 
-const filters: { label: string; value: RegistrationStatus | 'ALL' }[] = [
+const filters = computed<{ label: string; value: RegistrationStatus | 'ALL' }[]>(() => [
   { label: 'Pendientes', value: 'PENDING' },
   { label: 'Aprobados', value: 'APPROVED' },
   { label: 'Rechazados', value: 'REJECTED' },
+  // El Tesorero no recibe borradores: el filtro solo tiene sentido para Owner y Administrador.
+  ...(auth.isAdmin ? [{ label: 'Borradores', value: 'DRAFT' as const }] : []),
   { label: 'Todos', value: 'ALL' },
-]
+])
 
 const paymentFilters: { label: string; value: 'ALL' | 'FREE' | 'PAID' }[] = [
   { label: 'Todos', value: 'ALL' },
@@ -807,6 +824,7 @@ async function load() {
 }
 
 const reviewOpen = ref(false)
+const editOpen = ref(false)
 const reviewTeam = ref<Team | null>(null)
 const reviewPlayersOpen = ref(false)
 const registrationRejectReason = ref('')
@@ -820,6 +838,13 @@ function openReview(team: Team) {
   registrationRejectReason.value = ''
   reviewPlayersOpen.value = false
   reviewOpen.value = true
+}
+
+/** Tras editar el equipo se recarga la lista y la revisión muestra los datos nuevos. */
+async function onTeamEdited() {
+  const id = reviewTeam.value?.id
+  await loadTeams()
+  if (id) reviewTeam.value = teams.value.find((team) => team.id === id) ?? reviewTeam.value
 }
 
 async function approveReview() {

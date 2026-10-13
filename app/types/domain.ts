@@ -23,6 +23,8 @@ export type RegistrationStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'CANCELLED'
+  /** Equipo guardado y aún no enviado (solo salón o ciclo): el tesorero no lo ve. */
+  | 'DRAFT'
 
 export type VoucherStatus = 'PENDING' | 'VALIDATED' | 'REJECTED'
 
@@ -366,6 +368,8 @@ export interface GroupTeam {
   name: string
   slot: number | null
   status: RegistrationStatus
+  /** Motivo con el que se rechazó el equipo (solo si está `REJECTED`). */
+  rejectionReason?: string | null
   voucherId: number | null
 }
 
@@ -388,6 +392,8 @@ export interface ClassGroup {
   baseVoucher: GroupVoucher | null
   disciplines: GroupDiscipline[]
   extraVouchers: (GroupVoucher & { teamIds: number[] })[]
+  /** Equipos en borrador (0 para el tesorero, que no los ve). */
+  draftCount: number
 }
 
 /** Respuesta de validar un pago de grupo: equipos aprobados y omitidos con su motivo. */
@@ -460,7 +466,22 @@ export interface ResultsResponse {
 export interface AcademicStudent {
   fullName: string
   studentCode: string | null
+  /** Viene lleno cuando API_UNDC está conectada y conoce el DNI; si no, se escribe a mano. */
   dni: string | null
+}
+
+/** Conexión con API_UNDC (JP) para traer el DNI por código (GET /settings/undc-api). Nunca incluye la key. */
+export interface UndcApiConfig {
+  configured: boolean
+  baseUrl: string | null
+  keyMask: string | null
+  timeoutMs: number
+  enabled: boolean
+  lastStatus: 'OK' | 'FAILED' | null
+  lastError: string | null
+  lastCheckedAt: string | null
+  updatedAt: string | null
+  encryptionKey: 'dedicated' | 'derived' | 'none'
 }
 
 export interface ScheduledMatch {

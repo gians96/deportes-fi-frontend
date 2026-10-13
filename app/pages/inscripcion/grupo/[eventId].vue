@@ -38,6 +38,19 @@
         </div>
       </div>
 
+      <p
+        v-if="createSuccess"
+        class="mt-6 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300"
+      >
+        {{ createSuccess }}
+      </p>
+      <p
+        v-if="actionError"
+        class="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+      >
+        {{ actionError }}
+      </p>
+
       <!-- Mis salones y ciclos -->
       <section v-for="group in groups" :key="group.id" class="mt-8 rounded-2xl border border-oscuro-700 bg-oscuro-850 p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -68,28 +81,75 @@
         </div>
 
         <h3 class="mt-6 text-sm font-semibold text-oscuro-200">Equipos por disciplina</h3>
+        <p v-if="pricing" class="mt-1 text-xs text-oscuro-400">
+          El primer equipo de cada disciplina va incluido en el pago general. Cada equipo adicional en la
+          misma disciplina cuesta {{ formatCurrency(extraFee(pricing, group.scope)) }} y lleva su propio
+          comprobante.
+        </p>
+        <p
+          v-if="group.draftCount > 0"
+          class="mt-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200"
+        >
+          Tienes {{ group.draftCount }} equipo(s) en borrador: no se revisan hasta que los envíes.
+        </p>
+
         <ul class="mt-2 divide-y divide-oscuro-800">
           <li
             v-for="discipline in group.disciplines"
             :key="discipline.disciplineId"
-            class="flex flex-wrap items-center justify-between gap-3 py-3"
+            class="flex flex-wrap items-start justify-between gap-3 py-3"
           >
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <p class="font-semibold text-white">{{ discipline.name }}</p>
-              <ul v-if="discipline.teams.length" class="mt-1 space-y-1">
+              <ul v-if="discipline.teams.length" class="mt-2 space-y-2">
                 <li
                   v-for="team in discipline.teams"
                   :key="team.id"
-                  class="flex flex-wrap items-center gap-2 text-sm text-oscuro-200"
+                  class="rounded-lg bg-oscuro-900/50 px-3 py-2"
                 >
-                  <span>{{ team.name }}</span>
-                  <span
-                    v-if="team.slot"
-                    class="rounded-md bg-oscuro-900/70 px-2 py-0.5 text-xs text-oscuro-300"
+                  <div class="flex flex-wrap items-center gap-2 text-sm text-oscuro-200">
+                    <span class="font-semibold text-white">{{ team.name }}</span>
+                    <span
+                      v-if="team.slot"
+                      class="rounded-md bg-oscuro-900/70 px-2 py-0.5 text-xs text-oscuro-300"
+                    >
+                      {{ slotLabel(team.slot) }}
+                    </span>
+                    <StatusBadge :status="team.status" />
+                  </div>
+                  <p
+                    v-if="team.status === 'REJECTED' && team.rejectionReason"
+                    class="mt-1 text-xs text-red-300"
                   >
-                    {{ slotLabel(team.slot) }}
-                  </span>
-                  <StatusBadge :status="team.status" />
+                    Motivo: {{ team.rejectionReason }}
+                  </p>
+                  <div
+                    v-if="team.status === 'DRAFT' && event.isOpen"
+                    class="mt-2 flex flex-wrap items-center gap-2"
+                  >
+                    <NuxtLink
+                      :to="editLink(group, discipline.disciplineId, team.id)"
+                      class="rounded-lg bg-oscuro-700/60 px-3 py-1.5 text-xs font-semibold text-oscuro-100 hover:bg-oscuro-700"
+                    >
+                      Editar
+                    </NuxtLink>
+                    <button
+                      type="button"
+                      class="rounded-lg bg-green-500/15 px-3 py-1.5 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:opacity-50"
+                      :disabled="busyTeamId === team.id"
+                      @click="submitTeam(team.id)"
+                    >
+                      {{ busyTeamId === team.id ? 'Enviando…' : 'Enviar' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                      :disabled="busyTeamId === team.id"
+                      @click="askRemove(team.id, team.name)"
+                    >
+                      Quitar
+                    </button>
+                  </div>
                 </li>
               </ul>
               <p v-else class="mt-1 text-xs text-oscuro-400">Sin equipo todavía</p>
@@ -97,7 +157,7 @@
             <NuxtLink
               v-if="event.isOpen"
               :to="`/inscripcion/${discipline.disciplineId}?groupId=${group.id}`"
-              class="rounded-lg bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500/20"
+              class="shrink-0 rounded-lg bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500/20"
             >
               {{ registerLabel(group, discipline.disciplineId) }}
             </NuxtLink>
@@ -105,79 +165,98 @@
         </ul>
       </section>
 
-      <!-- Nuevo salón o ciclo -->
+      <!-- Nuevo salón o ciclo: un estudiante tiene un solo salón o ciclo activo por evento -->
       <section class="mt-8 rounded-2xl border border-oscuro-700 bg-oscuro-850 p-5">
-        <h2 class="text-lg font-bold text-white">
-          {{ groups.length ? 'Inscribir otro salón o ciclo' : 'Inscribir mi salón o ciclo' }}
-        </h2>
-        <p class="mt-1 text-sm text-oscuro-300">
-          Elige si participa un salón o el ciclo completo. Un ciclo completo reúne a todas sus
-          secciones, por eso no puede inscribirse a la vez que salones sueltos de ese ciclo.
-        </p>
+        <template v-if="hasActiveGroup">
+          <h2 class="text-lg font-bold text-white">Ya inscribiste tu salón o ciclo</h2>
+          <p class="mt-1 text-sm text-oscuro-300">
+            Para sumar más equipos de tu salón usa «+ Equipo adicional» en cada disciplina. Si necesitas
+            inscribir otro salón o ciclo, pide ayuda a un administrador.
+          </p>
+        </template>
+        <template v-else>
+          <h2 class="text-lg font-bold text-white">
+            {{ groups.length ? 'Inscribir de nuevo mi salón o ciclo' : 'Inscribir mi salón o ciclo' }}
+          </h2>
+          <p class="mt-1 text-sm text-oscuro-300">
+            Elige si participa un salón o el ciclo completo. Un ciclo completo reúne a todas sus
+            secciones, por eso no puede inscribirse a la vez que salones sueltos de ese ciclo. Solo puedes
+            inscribir un salón o ciclo por evento.
+          </p>
 
-        <form v-if="event.isOpen" class="mt-4 grid gap-4 sm:grid-cols-2" @submit.prevent="createGroup">
-          <div class="flex gap-2 sm:col-span-2">
+          <form v-if="event.isOpen" class="mt-4 grid gap-4 sm:grid-cols-2" @submit.prevent="createGroup">
+            <div class="flex gap-2 sm:col-span-2">
+              <button
+                v-for="option in scopes"
+                :key="option.value"
+                type="button"
+                class="rounded-lg px-4 py-2 text-sm font-semibold transition"
+                :class="
+                  form.scope === option.value
+                    ? 'bg-green-500/15 text-green-300'
+                    : 'bg-oscuro-900/60 text-oscuro-300 hover:bg-oscuro-800'
+                "
+                @click="form.scope = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+
+            <label class="block sm:col-span-2">
+              <span class="text-sm text-oscuro-200">Escuela profesional</span>
+              <select v-model.number="form.schoolId" required class="input">
+                <option :value="0" disabled>Selecciona tu escuela</option>
+                <option v-for="school in schools" :key="school.id" :value="school.id">
+                  {{ school.name }}
+                </option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-oscuro-200">Ciclo</span>
+              <input v-model="form.cycle" type="text" required class="input" placeholder="Ej. V o 5" />
+            </label>
+            <label v-if="form.scope === 'SECTION'" class="block">
+              <span class="text-sm text-oscuro-200">Sección</span>
+              <input v-model="form.section" type="text" required class="input" placeholder="Ej. A1" />
+            </label>
+
+            <div class="rounded-xl bg-oscuro-900/60 p-4 sm:col-span-2">
+              <p class="text-xs text-oscuro-400">Pago general a depositar</p>
+              <p class="text-2xl font-bold text-green-400">{{ formatCurrency(fee) }}</p>
+            </div>
+
+            <label class="block">
+              <span class="text-sm text-oscuro-200">N° de operación</span>
+              <input v-model="form.operationNumber" type="text" class="input" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-oscuro-200">Imagen del comprobante</span>
+              <input type="file" accept="image/*" required class="input" @change="onFile" />
+            </label>
+
+            <p v-if="createError" class="text-sm text-red-400 sm:col-span-2">{{ createError }}</p>
             <button
-              v-for="option in scopes"
-              :key="option.value"
-              type="button"
-              class="rounded-lg px-4 py-2 text-sm font-semibold transition"
-              :class="
-                form.scope === option.value
-                  ? 'bg-green-500/15 text-green-300'
-                  : 'bg-oscuro-900/60 text-oscuro-300 hover:bg-oscuro-800'
-              "
-              @click="form.scope = option.value"
+              type="submit"
+              class="rounded-lg bg-green-500 px-5 py-3 font-semibold text-oscuro-900 transition hover:bg-green-400 disabled:opacity-50 sm:col-span-2"
+              :disabled="creating"
             >
-              {{ option.label }}
+              {{ creating ? 'Enviando…' : 'Enviar pago y crear' }}
             </button>
-          </div>
-
-          <label class="block sm:col-span-2">
-            <span class="text-sm text-oscuro-200">Escuela profesional</span>
-            <select v-model.number="form.schoolId" required class="input">
-              <option :value="0" disabled>Selecciona tu escuela</option>
-              <option v-for="school in schools" :key="school.id" :value="school.id">
-                {{ school.name }}
-              </option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="text-sm text-oscuro-200">Ciclo</span>
-            <input v-model="form.cycle" type="text" required class="input" placeholder="Ej. V o 5" />
-          </label>
-          <label v-if="form.scope === 'SECTION'" class="block">
-            <span class="text-sm text-oscuro-200">Sección</span>
-            <input v-model="form.section" type="text" required class="input" placeholder="Ej. A1" />
-          </label>
-
-          <div class="rounded-xl bg-oscuro-900/60 p-4 sm:col-span-2">
-            <p class="text-xs text-oscuro-400">Pago general a depositar</p>
-            <p class="text-2xl font-bold text-green-400">{{ formatCurrency(fee) }}</p>
-          </div>
-
-          <label class="block">
-            <span class="text-sm text-oscuro-200">N° de operación</span>
-            <input v-model="form.operationNumber" type="text" class="input" />
-          </label>
-          <label class="block">
-            <span class="text-sm text-oscuro-200">Imagen del comprobante</span>
-            <input type="file" accept="image/*" required class="input" @change="onFile" />
-          </label>
-
-          <p v-if="createError" class="text-sm text-red-400 sm:col-span-2">{{ createError }}</p>
-          <p v-if="createSuccess" class="text-sm text-green-400 sm:col-span-2">{{ createSuccess }}</p>
-          <button
-            type="submit"
-            class="rounded-lg bg-green-500 px-5 py-3 font-semibold text-oscuro-900 transition hover:bg-green-400 disabled:opacity-50 sm:col-span-2"
-            :disabled="creating"
-          >
-            {{ creating ? 'Enviando…' : 'Enviar pago y crear' }}
-          </button>
-        </form>
-        <p v-else class="mt-4 text-sm text-oscuro-400">Las inscripciones de este evento están cerradas.</p>
+          </form>
+          <p v-else class="mt-4 text-sm text-oscuro-400">Las inscripciones de este evento están cerradas.</p>
+        </template>
       </section>
     </template>
+
+    <AppConfirm
+      v-model="removeOpen"
+      title="Quitar borrador"
+      :message="`Se eliminará el borrador «${removeName}» y quedará libre su cupo. ¿Continuar?`"
+      confirm-text="Quitar borrador"
+      :loading="removing"
+      :error="removeError"
+      @confirm="confirmRemove"
+    />
   </div>
 </template>
 
@@ -190,6 +269,7 @@ import {
   apiMessage,
   baseFee,
   extraFee,
+  isActiveGroup,
   scopeLabel,
   slotLabel,
 } from '~/utils/groups'
@@ -222,6 +302,14 @@ const form = reactive({
 const creating = ref(false)
 const createError = ref('')
 const createSuccess = ref('')
+const actionError = ref('')
+
+const busyTeamId = ref(0)
+const removeOpen = ref(false)
+const removeId = ref(0)
+const removeName = ref('')
+const removing = ref(false)
+const removeError = ref('')
 
 const schools = computed(() => {
   const faculty = faculties.value.find((item) => item.id === event.value?.facultyId)
@@ -230,6 +318,9 @@ const schools = computed(() => {
 })
 
 const fee = computed(() => (pricing.value ? baseFee(pricing.value, form.scope) : 0))
+
+/** Un estudiante tiene un solo salón o ciclo activo por evento (el servidor lo hace cumplir). */
+const hasActiveGroup = computed(() => groups.value.some(isActiveGroup))
 
 const fees = computed(() =>
   pricing.value
@@ -245,7 +336,11 @@ const fees = computed(() =>
 function registerLabel(group: ClassGroup, disciplineId: number) {
   if (!activeTeams(group, disciplineId).length) return 'Registrar equipo'
   const amount = pricing.value ? formatCurrency(extraFee(pricing.value, group.scope)) : ''
-  return `Agregar equipo adicional${amount ? ` · ${amount}` : ''}`
+  return `+ Equipo adicional${amount ? ` · ${amount}` : ''}`
+}
+
+function editLink(group: ClassGroup, disciplineId: number, teamId: number) {
+  return `/inscripcion/${disciplineId}?groupId=${group.id}&teamId=${teamId}`
 }
 
 function onFile(e: Event) {
@@ -257,6 +352,40 @@ async function loadGroups() {
     groups.value = await api.get<ClassGroup[]>('/groups/mine', { eventId })
   } catch {
     groups.value = []
+  }
+}
+
+async function submitTeam(teamId: number) {
+  actionError.value = ''
+  busyTeamId.value = teamId
+  try {
+    await api.post(`/registrations/${teamId}/submit`)
+    await loadGroups()
+  } catch (err) {
+    actionError.value = apiMessage(err, 'No se pudo enviar el equipo.')
+  } finally {
+    busyTeamId.value = 0
+  }
+}
+
+function askRemove(teamId: number, name: string) {
+  removeId.value = teamId
+  removeName.value = name
+  removeError.value = ''
+  removeOpen.value = true
+}
+
+async function confirmRemove() {
+  removing.value = true
+  removeError.value = ''
+  try {
+    await api.del(`/registrations/${removeId.value}`)
+    removeOpen.value = false
+    await loadGroups()
+  } catch (err) {
+    removeError.value = apiMessage(err, 'No se pudo quitar el borrador.')
+  } finally {
+    removing.value = false
   }
 }
 
