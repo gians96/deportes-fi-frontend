@@ -1,6 +1,12 @@
 // Tipos de dominio compartidos del frontend
 
-export type Role = 'OWNER_SYSTEM' | 'ADMIN_SYSTEM' | 'REFEREE' | 'STUDENT' | 'OTHER'
+export type Role =
+  | 'OWNER_SYSTEM'
+  | 'ADMIN_SYSTEM'
+  | 'TREASURER'
+  | 'REFEREE'
+  | 'STUDENT'
+  | 'OTHER'
 
 export type Gender = 'M' | 'F' | 'O'
 
@@ -46,6 +52,10 @@ export interface AuthUser {
   facultyId?: number | null
   schoolId?: number | null
   avatarUrl?: string | null
+  /** Solo en el listado de usuarios del panel: la cuenta también entra con correo y contraseña. */
+  hasPassword?: boolean
+  /** Solo en el listado de usuarios del panel: la cuenta ya inició sesión con Google. */
+  googleLinked?: boolean
 }
 
 export interface ProfessionalSchool {

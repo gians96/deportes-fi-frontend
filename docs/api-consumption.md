@@ -66,7 +66,7 @@ await api.upload('/registrations', fd)
 
 | Página | Endpoints principales |
 | ------ | --------------------- |
-| `login.vue` | `POST /auth/google`; acepta cualquier correo verificado por Google y el rol lo resuelve el backend |
+| `login.vue` | `POST /auth/google` (cualquier correo verificado por Google; el rol lo resuelve el backend) y `POST /auth/login` (correo y contraseña, solo para cuentas con «Contraseña o Google»; el error siempre es «Credenciales incorrectas» y 5 fallos bloquean 15 min con 429). La contraseña no se guarda en ningún lado |
 | `completar-perfil.vue` | `GET /faculties` para `STUDENT`; `PATCH /auth/me/profile` con `{ facultyId, schoolId }` para `STUDENT` o `{ dni }` para `OTHER` |
 | `index.vue` / `eventos/` | `GET /events`, `GET /events/:id`; en eventos `PER_GROUP` el detalle muestra las tarifas (`GET /events/:id/pricing`, con sesión) y enlaza a `inscripcion/grupo/:eventId` |
 | `disciplinas/` | `GET /disciplines`, `GET /disciplines/:id`; `GET /events/:id` para saber si el evento cobra por salón o ciclo (el botón lleva al hub) |
@@ -82,7 +82,7 @@ await api.upload('/registrations', fd)
 | `admin/inscripciones.vue` | `GET /registrations` con filtros (`status`, `eventId`, `disciplineId`, `isPaid`, `participantType`) y `phone` del equipo/delegado, `POST /registrations`, `PATCH /registrations/:id/approve\|reject`, `PATCH /vouchers/:id/validate`, `GET /disciplines`, `GET /academic/student` o `GET /academic/dni` (según `participantType`) |
 | `resultados/[id].vue` | `GET /standings/:disciplineId`; muestra tabla principal para puntos y llave responsive para eliminación |
 | `admin/vouchers.vue` | `GET /vouchers`, `PATCH /vouchers/:id/validate\|reject` (vista secundaria de compatibilidad) |
-| `admin/usuarios.vue` | `GET/POST /users`, `PATCH /users/:id`, `/users/:id/active`, `/users/:id/role`; incluye rol `REFEREE` |
+| `admin/usuarios.vue` | `GET/POST /users`, `PATCH /users/:id`, `/users/:id/active`, `/users/:id/role`, `/users/:id/password`; roles `STUDENT`, `OTHER`, `REFEREE`, `TREASURER` (y `ADMIN_SYSTEM`/`OWNER_SYSTEM` solo si quien opera es Owner); «Acceso» = Solo Google o Contraseña o Google; el listado trae `hasPassword` y `googleLinked`, nunca el hash |
 | `admin/dashboard.vue` | `GET /admin/dashboard` |
 
 > El contrato completo (bodies y reglas) está en el repo del backend:

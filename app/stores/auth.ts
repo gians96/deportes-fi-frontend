@@ -34,6 +34,18 @@ export const useAuthStore = defineStore('auth', {
       state.user?.role === 'OWNER_SYSTEM',
     isOwner: (state) => state.user?.role === 'OWNER_SYSTEM',
     isReferee: (state) => state.user?.role === 'REFEREE',
+    isTreasurer: (state) => state.user?.role === 'TREASURER',
+    /** Quien ve y valida pagos: el equipo y el tesorero. */
+    canValidatePayments: (state) =>
+      state.user?.role === 'ADMIN_SYSTEM' ||
+      state.user?.role === 'OWNER_SYSTEM' ||
+      state.user?.role === 'TREASURER',
+    /** Pantalla de inicio de cada rol. */
+    homePath(): string {
+      if (this.isAdmin || this.isTreasurer) return '/admin/dashboard'
+      if (this.isReferee) return '/admin/disciplinas'
+      return '/'
+    },
     canManageFixture: (state) =>
       state.user?.role === 'ADMIN_SYSTEM' ||
       state.user?.role === 'OWNER_SYSTEM' ||
@@ -58,6 +70,31 @@ export const useAuthStore = defineStore('auth', {
         const data = await api.post<{ token: string; user: AuthUser }>(
           '/auth/google',
           { idToken },
+        )
+        this.token = data.token
+        this.user = data.user
+        tokenCookie().value = data.token
+        return true
+      } catch (err: unknown) {
+        this.error =
+          (err as { data?: { message?: string } })?.data?.message ??
+          'No se pudo iniciar sesión'
+        this.clearSession()
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /** Acceso con correo y contraseña (cuentas con «Contraseña o Google»). La contraseña no se conserva. */
+    async loginWithPassword(email: string, password: string) {
+      this.loading = true
+      this.error = null
+      try {
+        const api = useApi()
+        const data = await api.post<{ token: string; user: AuthUser }>(
+          '/auth/login',
+          { email, password },
         )
         this.token = data.token
         this.user = data.user

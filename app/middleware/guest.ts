@@ -13,12 +13,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (!auth.isLoggedIn) return
 
-  if (auth.isAdmin) {
-    return navigateTo('/admin/dashboard')
-  }
-
-  if (auth.isReferee) {
-    return navigateTo('/admin/disciplinas')
+  if (auth.isAdmin || auth.isTreasurer || auth.isReferee) {
+    return navigateTo(auth.homePath)
   }
 
   if (auth.needsProfile) {

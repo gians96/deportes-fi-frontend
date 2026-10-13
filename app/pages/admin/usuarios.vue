@@ -25,6 +25,7 @@
             <th class="px-4 py-3">Correo</th>
             <th class="px-4 py-3">Facultad / Escuela</th>
             <th class="px-4 py-3">Rol</th>
+            <th class="px-4 py-3">Acceso</th>
             <th class="px-4 py-3">Estado</th>
             <th class="px-4 py-3"></th>
           </tr>
@@ -50,11 +51,24 @@
                 <option value="STUDENT">Estudiante</option>
                 <option value="OTHER">Otro</option>
                 <option value="REFEREE">Árbitro</option>
+                <option value="TREASURER">Tesorero</option>
                 <option v-if="auth.isOwner" value="ADMIN_SYSTEM">
                   Administrador
                 </option>
                 <option v-if="auth.isOwner" value="OWNER_SYSTEM">Owner</option>
               </select>
+            </td>
+            <td class="px-4 py-3">
+              <span
+                class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                :class="
+                  u.hasPassword
+                    ? 'bg-sky-500/10 text-sky-300'
+                    : 'bg-oscuro-800 text-oscuro-300'
+                "
+              >
+                {{ u.hasPassword ? 'Contraseña o Google' : 'Solo Google' }}
+              </span>
             </td>
             <td class="px-4 py-3">
               <span
@@ -75,6 +89,12 @@
                   @click="openEdit(u)"
                 >
                   Editar
+                </button>
+                <button
+                  class="text-sm font-semibold text-amber-300 hover:text-amber-200"
+                  @click="openPassword(u)"
+                >
+                  Contraseña
                 </button>
                 <button
                   class="text-sm font-semibold hover:opacity-80"
@@ -107,6 +127,7 @@
             <option value="STUDENT">Estudiante</option>
             <option value="OTHER">Otro</option>
             <option value="REFEREE">Árbitro</option>
+            <option value="TREASURER">Tesorero</option>
             <option v-if="auth.isOwner" value="ADMIN_SYSTEM">Administrador</option>
             <option v-if="auth.isOwner" value="OWNER_SYSTEM">Owner</option>
           </select>
@@ -133,6 +154,82 @@
             </option>
           </select>
         </label>
+        <fieldset class="sm:col-span-2">
+          <legend class="text-sm text-oscuro-200">Acceso</legend>
+          <div class="mt-1 grid gap-3 sm:grid-cols-2">
+            <label
+              class="access-option"
+              :class="{ 'access-option-active': createForm.accessMode === 'GOOGLE' }"
+            >
+              <input v-model="createForm.accessMode" type="radio" value="GOOGLE" class="mt-1" />
+              <span>
+                <span class="block text-sm font-semibold text-white">Solo Google</span>
+                <span class="block text-xs text-oscuro-300">
+                  Entra con «Continuar con Google» usando este correo (Gmail o cuenta institucional).
+                </span>
+              </span>
+            </label>
+            <label
+              class="access-option"
+              :class="{ 'access-option-active': createForm.accessMode === 'PASSWORD' }"
+            >
+              <input v-model="createForm.accessMode" type="radio" value="PASSWORD" class="mt-1" />
+              <span>
+                <span class="block text-sm font-semibold text-white">Contraseña o Google</span>
+                <span class="block text-xs text-oscuro-300">
+                  Entra con este correo y una contraseña; también puede usar Google.
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <div v-if="createForm.accessMode === 'PASSWORD'" class="sm:col-span-2">
+          <label class="block">
+          <span class="text-sm text-oscuro-200">Contraseña (10 a 128 caracteres)</span>
+          <div class="mt-1 flex gap-2">
+            <input
+              v-model="createForm.password"
+              :type="createForm.showPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              minlength="10"
+              maxlength="128"
+              required
+              class="input !mt-0 font-mono"
+            />
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-oscuro-700 px-3 text-xs font-semibold text-oscuro-200 hover:text-white"
+              @click="createForm.showPassword = !createForm.showPassword"
+            >
+              {{ createForm.showPassword ? 'Ocultar' : 'Mostrar' }}
+            </button>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-oscuro-700 px-3 text-xs font-semibold text-oscuro-200 hover:text-white"
+              @click="fillGenerated(createForm)"
+            >
+              Generar
+            </button>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-oscuro-700 px-3 text-xs font-semibold text-oscuro-200 hover:text-white disabled:opacity-50"
+              :disabled="!createForm.password"
+              @click="copyPassword(createForm.password)"
+            >
+              {{ copied ? 'Copiado' : 'Copiar' }}
+            </button>
+          </div>
+          </label>
+          <p class="mt-1 text-xs text-oscuro-400">
+            Entrega la contraseña por un canal seguro: no se vuelve a mostrar.
+          </p>
+          <p
+            v-if="createForm.role === 'STUDENT' && (!createForm.facultyId || !createForm.schoolId)"
+            class="mt-1 text-xs text-amber-300"
+          >
+            Sin facultad y escuela, el estudiante tendrá que completar su perfil al entrar.
+          </p>
+        </div>
         <p v-if="modalError" class="text-sm text-red-400 sm:col-span-2">{{ modalError }}</p>
         <button
           type="submit"
@@ -142,7 +239,11 @@
         </button>
       </form>
       <p class="mt-3 text-xs text-oscuro-400">
-        El acceso se activa cuando la persona inicia sesión con Google usando este correo.
+        {{
+          createForm.accessMode === 'PASSWORD'
+            ? 'La persona entra desde «Ingresar» con este correo y la contraseña.'
+            : 'El acceso se activa cuando la persona inicia sesión con Google usando este correo.'
+        }}
       </p>
     </AppModal>
 
@@ -199,6 +300,83 @@
       :error="modalError"
       @confirm="runToggleActive"
     />
+
+    <!-- Contraseña de una cuenta -->
+    <AppModal
+      v-model="passwordOpen"
+      :title="'Contraseña de ' + (passwordTarget?.fullName ?? '')"
+    >
+      <form class="grid gap-4" @submit.prevent="savePassword">
+        <p class="text-sm text-oscuro-300">
+          {{
+            passwordTarget?.hasPassword
+              ? 'Esta cuenta ya entra con contraseña. Al cambiarla se cierran sus sesiones abiertas.'
+              : 'Con una contraseña la cuenta podrá entrar con correo y contraseña, además de Google.'
+          }}
+        </p>
+        <label class="block">
+          <span class="text-sm text-oscuro-200">Contraseña (10 a 128 caracteres)</span>
+          <div class="mt-1 flex gap-2">
+            <input
+              v-model="passwordForm.password"
+              :type="passwordForm.showPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              minlength="10"
+              maxlength="128"
+              required
+              class="input !mt-0 font-mono"
+            />
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-oscuro-700 px-3 text-xs font-semibold text-oscuro-200 hover:text-white"
+              @click="passwordForm.showPassword = !passwordForm.showPassword"
+            >
+              {{ passwordForm.showPassword ? 'Ocultar' : 'Mostrar' }}
+            </button>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-oscuro-700 px-3 text-xs font-semibold text-oscuro-200 hover:text-white"
+              @click="fillGenerated(passwordForm)"
+            >
+              Generar
+            </button>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-oscuro-700 px-3 text-xs font-semibold text-oscuro-200 hover:text-white disabled:opacity-50"
+              :disabled="!passwordForm.password"
+              @click="copyPassword(passwordForm.password)"
+            >
+              {{ copied ? 'Copiado' : 'Copiar' }}
+            </button>
+          </div>
+        </label>
+        <p v-if="modalError" class="text-sm text-red-400">{{ modalError }}</p>
+        <button
+          type="submit"
+          class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400"
+        >
+          Guardar contraseña
+        </button>
+        <button
+          v-if="passwordTarget?.hasPassword"
+          type="button"
+          class="rounded-lg border border-red-500/40 px-5 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/10"
+          @click="askRemovePassword"
+        >
+          Quitar contraseña (solo Google)
+        </button>
+      </form>
+    </AppModal>
+
+    <AppConfirm
+      v-model="removePasswordOpen"
+      title="Quitar contraseña"
+      :message="'La cuenta de ' + (passwordTarget?.fullName ?? '') + ' volverá a entrar solo con Google y se cerrarán sus sesiones abiertas.'"
+      confirm-text="Quitar"
+      :loading="removePasswordLoading"
+      :error="modalError"
+      @confirm="runRemovePassword"
+    />
   </div>
 </template>
 
@@ -238,7 +416,7 @@ function showModalError(err: unknown, fallback: string) {
 }
 
 function isNonAcademicRole(role: AuthUser['role']) {
-  return role === 'OTHER' || role === 'REFEREE'
+  return role === 'OTHER' || role === 'REFEREE' || role === 'TREASURER'
 }
 
 // Un owner puede editar a cualquiera salvo otros owners.
@@ -247,7 +425,12 @@ function canEdit(u: AuthUser) {
   if (u.role === 'OWNER_SYSTEM') return false
   if (u.id === auth.user?.id) return false
   if (auth.isOwner) return true
-  return u.role === 'STUDENT' || u.role === 'OTHER' || u.role === 'REFEREE'
+  return (
+    u.role === 'STUDENT' ||
+    u.role === 'OTHER' ||
+    u.role === 'REFEREE' ||
+    u.role === 'TREASURER'
+  )
 }
 
 async function load() {
@@ -271,6 +454,44 @@ async function updateRole(u: AuthUser) {
   }
 }
 
+// --- Contraseñas: generar, copiar, validar ---
+const PASSWORD_HINT = 'La contraseña debe tener entre 10 y 128 caracteres.'
+const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+const copied = ref(false)
+
+function validPassword(value: string) {
+  return value.length >= 10 && value.length <= 128
+}
+
+/** Contraseña aleatoria legible (sin caracteres ambiguos); solo se genera al pulsar «Generar». */
+function generatePassword(length = 14) {
+  const limit = 256 - (256 % PASSWORD_ALPHABET.length)
+  let out = ''
+  while (out.length < length) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(length * 2))) {
+      if (byte < limit && out.length < length) {
+        out += PASSWORD_ALPHABET[byte % PASSWORD_ALPHABET.length]
+      }
+    }
+  }
+  return out
+}
+
+function fillGenerated(form: { password: string; showPassword: boolean }) {
+  form.password = generatePassword()
+  form.showPassword = true
+}
+
+async function copyPassword(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 1500)
+  } catch {
+    // Sin permiso de portapapeles: la persona puede seleccionarla y copiarla a mano.
+  }
+}
+
 // --- Crear usuario ---
 const createOpen = ref(false)
 const createForm = reactive({
@@ -280,6 +501,10 @@ const createForm = reactive({
   dni: '',
   facultyId: 0,
   schoolId: 0,
+  accessMode: 'GOOGLE' as 'GOOGLE' | 'PASSWORD',
+  // La contraseña solo vive en este formulario mientras se envía; no se guarda en el navegador.
+  password: '',
+  showPassword: false,
 })
 const createSchools = computed(() => schoolsOf(createForm.facultyId))
 watch(
@@ -307,12 +532,19 @@ function openCreate() {
     dni: '',
     facultyId: 0,
     schoolId: 0,
+    accessMode: 'GOOGLE',
+    password: '',
+    showPassword: false,
   })
   createOpen.value = true
 }
 
 async function createUser() {
   modalError.value = ''
+  if (createForm.accessMode === 'PASSWORD' && !validPassword(createForm.password)) {
+    modalError.value = PASSWORD_HINT
+    return
+  }
   try {
     await api.post('/users', {
       fullName: createForm.fullName,
@@ -321,7 +553,9 @@ async function createUser() {
       dni: createForm.dni || undefined,
       facultyId: isNonAcademicRole(createForm.role) ? undefined : createForm.facultyId || undefined,
       schoolId: isNonAcademicRole(createForm.role) ? undefined : createForm.schoolId || undefined,
+      password: createForm.accessMode === 'PASSWORD' ? createForm.password : undefined,
     })
+    createForm.password = ''
     createOpen.value = false
     await load()
   } catch (err) {
@@ -388,6 +622,61 @@ async function saveUser() {
   }
 }
 
+// --- Contraseña de una cuenta existente ---
+const passwordOpen = ref(false)
+const passwordTarget = ref<AuthUser | null>(null)
+const passwordForm = reactive({ password: '', showPassword: false })
+const removePasswordOpen = ref(false)
+const removePasswordLoading = ref(false)
+
+function openPassword(u: AuthUser) {
+  modalError.value = ''
+  passwordTarget.value = u
+  Object.assign(passwordForm, { password: '', showPassword: false })
+  passwordOpen.value = true
+}
+
+async function savePassword() {
+  if (!passwordTarget.value) return
+  modalError.value = ''
+  if (!validPassword(passwordForm.password)) {
+    modalError.value = PASSWORD_HINT
+    return
+  }
+  try {
+    await api.patch(`/users/${passwordTarget.value.id}/password`, {
+      password: passwordForm.password,
+    })
+    passwordForm.password = ''
+    passwordOpen.value = false
+    await load()
+  } catch (err) {
+    showModalError(err, 'No se pudo guardar la contraseña')
+  }
+}
+
+function askRemovePassword() {
+  modalError.value = ''
+  passwordForm.password = ''
+  passwordOpen.value = false
+  removePasswordOpen.value = true
+}
+
+async function runRemovePassword() {
+  if (!passwordTarget.value) return
+  removePasswordLoading.value = true
+  modalError.value = ''
+  try {
+    await api.patch(`/users/${passwordTarget.value.id}/password`, { password: null })
+    removePasswordOpen.value = false
+    await load()
+  } catch (err) {
+    showModalError(err, 'No se pudo quitar la contraseña')
+  } finally {
+    removePasswordLoading.value = false
+  }
+}
+
 // --- Inhabilitar / habilitar ---
 const confirmOpen = ref(false)
 const confirmLoading = ref(false)
@@ -448,5 +737,17 @@ onMounted(async () => {
 .input:focus {
   border-color: #4ade80;
   box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.4);
+}
+.access-option {
+  display: flex;
+  gap: 0.75rem;
+  cursor: pointer;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(55, 65, 81, 0.6);
+  padding: 0.75rem;
+}
+.access-option-active {
+  border-color: #4ade80;
+  background-color: rgba(34, 197, 94, 0.08);
 }
 </style>

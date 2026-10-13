@@ -49,11 +49,11 @@
               Mis inscripciones
             </NuxtLink>
             <NuxtLink
-              v-if="auth.isAdmin || auth.isReferee"
-              :to="auth.isReferee ? '/admin/disciplinas' : '/admin/dashboard'"
+              v-if="auth.isAdmin || auth.isTreasurer || auth.isReferee"
+              :to="auth.homePath"
               class="hidden rounded-lg bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500/20 sm:block"
             >
-              {{ auth.isReferee ? 'Panel árbitro' : 'Panel admin' }}
+              {{ auth.isReferee ? 'Panel árbitro' : auth.isTreasurer ? 'Panel tesorería' : 'Panel admin' }}
             </NuxtLink>
             <button
               class="rounded-lg border border-oscuro-700 px-3 py-2 text-sm font-semibold text-oscuro-200 transition hover:text-white"

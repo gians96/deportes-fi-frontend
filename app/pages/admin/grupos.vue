@@ -193,7 +193,7 @@
               </span>
               <StatusBadge :status="team.status" />
               <button
-                v-if="canApprove(group, team)"
+                v-if="auth.isAdmin && canApprove(group, team)"
                 class="rounded-lg bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-300 hover:bg-green-500/25 disabled:opacity-60"
                 :disabled="busy"
                 @click="approveTeam(team.id, team.name)"
@@ -257,10 +257,12 @@ import type {
 } from '~/types/domain'
 import { formatCurrency } from '~/utils/format'
 import { apiMessage, scopeLabel, slotLabel, uploadUrl } from '~/utils/groups'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const api = useApi()
+const auth = useAuthStore()
 const config = useRuntimeConfig()
 
 const events = ref<SportEvent[]>([])

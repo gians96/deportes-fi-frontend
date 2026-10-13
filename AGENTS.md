@@ -69,6 +69,14 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
 - En el panel admin, respetar permisos: `admin.ts` exige rol OWNER/ADMIN; en
   usuarios, un admin no edita admins/owners y nadie se inhabilita a sí mismo.
 - Disciplinas pagadas (`isPaid`) requieren voucher en la inscripción.
+- Roles del panel (spec 004): `OWNER_SYSTEM` y `ADMIN_SYSTEM` gestionan todo (solo el Owner asigna Administrador u
+  Owner); `TREASURER` (Tesorero) solo ve y valida pagos: entra a `/admin/dashboard`, `/admin/inscripciones` y
+  `/admin/grupos` (`middleware/admin.ts`), no ve usuarios, eventos ni integraciones, y en esas pantallas no aprueba
+  ni rechaza equipos ni crea equipos (solo valida o rechaza comprobantes). `auth.homePath` decide a dónde va cada rol.
+  El servidor es quien manda: ocultar un botón no sustituye al permiso del backend.
+- Acceso por contraseña (spec 004): la contraseña solo se escribe en un `input` (con «Mostrar», «Generar» y «Copiar» en
+  el panel de usuarios) y se envía una vez; **nunca** se guarda en cookies, `localStorage`, stores ni consola, y el
+  campo se vacía tras enviar. El formulario de `login.vue` y el modal de contraseña no repiten el valor en la pantalla.
 - Proveedores de DNI (`admin/integraciones.vue`, spec 003): Decolecta y API Perú se configuran desde el
   panel y viven en la base de datos del backend, no en variables de entorno. El token se escribe en
   un campo `password`, se envía una vez y **nunca** se guarda en cookies, `localStorage`, stores ni
@@ -200,7 +208,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (depende de `backend/specs/003-proveedores-dni`).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (depende de `backend/specs/003-proveedores-dni`), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`).
 
 ## Antes de dar por terminado
 

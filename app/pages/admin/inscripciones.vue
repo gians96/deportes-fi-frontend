@@ -8,6 +8,7 @@
         </p>
       </div>
       <button
+        v-if="auth.isAdmin"
         class="shrink-0 rounded-lg bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-300 hover:bg-green-500/20"
         @click="openCreate"
       >
@@ -384,7 +385,7 @@
         </div>
       </div>
 
-      <template v-if="reviewTeam && reviewTeam.status === 'PENDING'" #footer>
+      <template v-if="reviewTeam && reviewTeam.status === 'PENDING' && auth.isAdmin" #footer>
         <div class="grid gap-3">
           <div
             v-if="needsVoucher(reviewTeam) && reviewTeam.voucher?.status === 'PENDING'"
@@ -435,6 +436,40 @@
               Rechazar inscripción
             </button>
           </div>
+        </div>
+      </template>
+
+      <!-- Tesorero: solo valida o rechaza el comprobante; aprobar o rechazar equipos es del administrador -->
+      <template
+        v-else-if="
+          reviewTeam &&
+          reviewTeam.status === 'PENDING' &&
+          auth.isTreasurer &&
+          needsVoucher(reviewTeam) &&
+          reviewTeam.voucher?.status === 'PENDING'
+        "
+        #footer
+      >
+        <div class="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <input
+            v-model="registrationRejectReason"
+            placeholder="Motivo de rechazo del comprobante"
+            class="min-w-0 rounded-lg border border-oscuro-700 bg-oscuro-900/60 px-3 py-2 text-sm text-white"
+          />
+          <button
+            class="rounded-lg bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/25 disabled:opacity-50"
+            :disabled="!registrationRejectReason.trim()"
+            @click="rejectVoucher"
+          >
+            Rechazar comprobante
+          </button>
+          <button
+            class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-50"
+            :disabled="!reviewRules.ok"
+            @click="validateVoucher"
+          >
+            {{ reviewTeam.groupId ? 'Validar pago del salón y aprobar equipos' : 'Validar voucher y aprobar' }}
+          </button>
         </div>
       </template>
     </AppModal>
@@ -603,16 +638,18 @@ import {
   participantTypeLabel,
 } from '~/utils/participants'
 import { getSportMeta } from '~/utils/sports'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const route = useRoute()
 const api = useApi()
+const auth = useAuthStore()
 const config = useRuntimeConfig()
 const teams = ref<Team[]>([])
 const filter = ref<RegistrationStatus | 'ALL'>('PENDING')
 const paymentFilter = ref<'ALL' | 'FREE' | 'PAID'>(
-  route.query.payment === 'PAID' ? 'PAID' : 'ALL',
+  route.query.payment === 'PAID' || auth.isTreasurer ? 'PAID' : 'ALL',
 )
 
 const events = ref<SportEvent[]>([])
@@ -751,6 +788,8 @@ async function loadDisciplines() {
 }
 
 async function loadUsers() {
+  // La lista de usuarios solo la ve el equipo (sirve para elegir delegado al crear equipos).
+  if (!auth.isAdmin) return
   try {
     users.value = await api.get<AuthUser[]>('/users')
   } catch {
@@ -802,6 +841,16 @@ async function rejectReview() {
 async function validateVoucher() {
   if (!reviewTeam.value?.voucher) return
   await api.patch(`/vouchers/${reviewTeam.value.voucher.id}/validate`, {})
+  reviewOpen.value = false
+  await loadTeams()
+}
+
+/** Rechaza solo el comprobante (el delegado puede reemplazarlo); el equipo sigue pendiente. */
+async function rejectVoucher() {
+  if (!reviewTeam.value?.voucher) return
+  const reason = registrationRejectReason.value.trim()
+  if (!reason) return
+  await api.patch(`/vouchers/${reviewTeam.value.voucher.id}/reject`, { reason })
   reviewOpen.value = false
   await loadTeams()
 }

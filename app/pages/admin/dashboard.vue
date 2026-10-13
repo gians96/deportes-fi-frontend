@@ -43,7 +43,9 @@ import {
   CalendarRange,
   Trophy,
   Building2,
+  Layers,
 } from 'lucide-vue-next'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
@@ -76,12 +78,22 @@ const cards = computed(() => [
 const chartLabels = computed(() => stats.value.chartLabels)
 const chartValues = computed(() => stats.value.chartValues)
 
-const actions = [
+const auth = useAuthStore()
+
+const adminActions = [
   { to: '/admin/eventos', label: 'Crear evento', icon: CalendarRange },
   { to: '/admin/disciplinas', label: 'Nueva disciplina', icon: Trophy },
   { to: '/admin/inscripciones?payment=PAID', label: 'Equipos de pago', icon: Receipt },
   { to: '/admin/usuarios', label: 'Gestionar usuarios', icon: Building2 },
 ]
+
+// El tesorero solo ve y valida pagos.
+const treasuryActions = [
+  { to: '/admin/inscripciones?payment=PAID', label: 'Equipos de pago', icon: Receipt },
+  { to: '/admin/grupos', label: 'Salones y ciclos', icon: Layers },
+]
+
+const actions = computed(() => (auth.isTreasurer ? treasuryActions : adminActions))
 
 onMounted(async () => {
   try {

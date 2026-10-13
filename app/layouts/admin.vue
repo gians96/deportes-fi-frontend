@@ -13,10 +13,10 @@
           />
           <div>
             <h1 class="text-xl font-bold text-white">
-              FI <span class="text-green-400 glow-text">{{ auth.isReferee ? 'Árbitro' : 'Admin' }}</span>
+              FI <span class="text-green-400 glow-text">{{ auth.isReferee ? 'Árbitro' : auth.isTreasurer ? 'Tesorería' : 'Admin' }}</span>
             </h1>
             <p class="text-sm text-oscuro-300">
-              {{ auth.isReferee ? 'Gestión de fixture' : 'Panel de control' }}
+              {{ auth.isReferee ? 'Gestión de fixture' : auth.isTreasurer ? 'Validación de pagos' : 'Panel de control' }}
             </p>
           </div>
         </div>
@@ -126,7 +126,17 @@ const refereeMenuItems = [
   { to: '/admin/disciplinas', label: 'Disciplinas', icon: Trophy },
 ]
 
-const menuItems = computed(() => (auth.isReferee ? refereeMenuItems : adminMenuItems))
+const treasuryMenuItems = [
+  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/inscripciones', label: 'Equipos de pago', icon: Users },
+  { to: '/admin/grupos', label: 'Salones y ciclos', icon: Layers },
+]
+
+const menuItems = computed(() => {
+  if (auth.isReferee) return refereeMenuItems
+  if (auth.isTreasurer) return treasuryMenuItems
+  return adminMenuItems
+})
 
 const pageTitle = computed(() => {
   const current = menuItems.value.find((i) => route.path.startsWith(i.to))
