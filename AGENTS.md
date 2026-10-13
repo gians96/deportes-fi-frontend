@@ -90,6 +90,16 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
   sección son texto libre (el servidor los normaliza). Los montos y los cupos los decide el backend;
   la pantalla solo los muestra. Los equipos de un grupo se tratan como "de pago" con el comprobante
   del grupo (`paysByGroup` en `utils/groups.ts`), no por `discipline.isPaid`.
+- Borradores, comprobante y API UNDC (spec 006, depende de `backend/specs/006-borradores-edicion-dni-automatico`): un
+  equipo de un salón o ciclo se guarda como **borrador** (`DRAFT`: «Guardar borrador», editar con `?teamId=`,
+  «Enviar» → `PENDING`, «Quitar»); después de enviarlo solo lo edita un administrador (`AdminTeamEditModal`). El
+  Tesorero nunca recibe borradores. Un estudiante tiene un solo salón o ciclo activo por evento (el servidor lo hace
+  cumplir; la pantalla oculta el formulario con `isActiveGroup`). «Ver comprobante» **no** abre pestañas: usa
+  `VoucherLink`/`VoucherViewerModal` (sobre `AppModal`, que queda por encima del menú lateral). La búsqueda de
+  personas es `useRosterSearch` (compartida por el formulario y el editor del administrador); el DNI llega solo
+  cuando API UNDC está conectada y sigue siendo editable («Del padrón»). `UndcApiCard` (Integraciones): la API key va
+  en un campo `password`, se envía una vez y nunca se guarda en cookies, `localStorage`, `sessionStorage`, stores ni
+  consola; solo se muestra `keyMask`.
 - Tokens de integración por evento (`admin/eventos.vue` → "Tokens API"): el
   valor completo `dfi_…` solo se muestra una vez tras crearlo; nunca guardarlo
   en cookies, `localStorage`, stores ni consola.
@@ -210,7 +220,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`), `006-borradores-comprobante-dni` (depende de `backend/specs/006-borradores-edicion-dni-automatico`).
 
 ## Antes de dar por terminado
 

@@ -85,5 +85,16 @@ await api.upload('/registrations', fd)
 | `admin/usuarios.vue` | `GET/POST /users`, `PATCH /users/:id`, `/users/:id/active`, `/users/:id/role`, `/users/:id/password`; roles `STUDENT`, `OTHER`, `REFEREE`, `TREASURER` (y `ADMIN_SYSTEM`/`OWNER_SYSTEM` solo si quien opera es Owner); «Acceso» = Solo Google o Contraseña o Google; el listado trae `hasPassword` y `googleLinked`, nunca el hash |
 | `admin/dashboard.vue` | `GET /admin/dashboard` |
 
+### Borradores, edición, comprobante y API UNDC (spec 006)
+
+| Pantalla o componente | Llamadas |
+| --------------------- | -------- |
+| `inscripcion/[id].vue` (equipos de un salón o ciclo) | «Guardar borrador» nuevo: `POST /registrations` (multipart) con `draft=true`; borrador existente (`?teamId=`): carga con `GET /registrations/mine` y guarda con `PATCH /registrations/:id` (JSON `{ teamName, phone, participants[] }`, la nómina se reemplaza completa); «Enviar inscripción»: `POST /registrations` sin `draft` (equipo nuevo) o `PATCH` + `POST /registrations/:id/submit` (borrador). Busca personas con `GET /academic/student?buscador=` (devuelve `dni` cuando API UNDC está conectada) o `GET /academic/dni` |
+| `inscripcion/grupo/[eventId].vue` | Muestra `draftCount`, `rejectionReason` y el estado `DRAFT` de `GET /groups/mine`; «Enviar» → `POST /registrations/:id/submit`; «Quitar» → `DELETE /registrations/:id` (solo borradores). `POST /groups` responde 409 si el estudiante ya tiene un salón o ciclo activo en el evento (la pantalla oculta el formulario con la misma regla, `isActiveGroup`) |
+| `components/AdminTeamEditModal.vue` (en `admin/inscripciones.vue`) | `PATCH /registrations/:id` (Owner y Administrador, cualquier estado salvo cancelado) con búsqueda por `GET /academic/student` o `/dni`; los errores del servidor se muestran tal cual. Filtro «Borradores» = `DRAFT` (el Tesorero no los recibe) |
+| `admin/grupos.vue` | «Validar pago» se desactiva si el comprobante no cubre ningún equipo enviado (`status !== 'DRAFT'`); cuenta los borradores aparte |
+| `components/VoucherViewerModal.vue` / `VoucherLink.vue` | Sin llamadas: muestran `/uploads/vouchers/…` (servido por el backend) dentro de un modal |
+| `components/UndcApiCard.vue` (en `admin/integraciones.vue`) | `GET`, `PUT` y `DELETE /settings/undc-api`, `POST /settings/undc-api/test`. La API key viaja una sola vez en el `PUT`; la respuesta solo trae `keyMask` |
+
 > El contrato completo (bodies y reglas) está en el repo del backend:
 > `backend/docs/api-contract.md`.
