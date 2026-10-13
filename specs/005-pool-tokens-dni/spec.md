@@ -77,5 +77,5 @@
 `  prioridad (5, 10, 30); «Eliminar» lo quita; la consulta manual responde «desde la caché» y «vía DECOLECTA», y
 `  «Ningún proveedor encontró ese DNI»; «Vaciar la caché» borra 6 entradas y la consulta siguiente vuelve al proveedor. El
 `  gráfico apilado se dibuja.
-`- Cookies: solo \`g_state\` y \`deportes_fi_token\`; \`localStorage\` y \`sessionStorage\` vacíos.
+- Cookies: solo `g_state` y `deportes_fi_token`; `localStorage` y `sessionStorage` vacíos.
 `- Pendiente: vista móvil y probar con Decolecta/API Perú reales (hace falta un token propio).
