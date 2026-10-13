@@ -221,6 +221,40 @@ export interface Voucher {
   participants?: Participant[]
 }
 
+export type DniProviderName = 'DECOLECTA' | 'APIPERU'
+
+export type CredentialState = 'UNVERIFIED' | 'VALID' | 'INVALID'
+
+/** Origen de la clave que cifra los tokens en el servidor. */
+export type EncryptionKeySource = 'dedicated' | 'derived' | 'none'
+
+/** Proveedor de consulta de DNI configurado en la plataforma (nunca incluye el token). */
+export interface DniProviderConfig {
+  provider: DniProviderName
+  label: string
+  enabled: boolean
+  priority: number
+  apiUrl: string
+  defaultUrl: string
+  customUrl: boolean
+  configured: boolean
+  tokenMask: string | null
+  state: CredentialState
+  lastError: string | null
+  lastCheckedAt: string | null
+}
+
+export interface DniProvidersResponse {
+  encryptionKey: EncryptionKeySource
+  providers: DniProviderConfig[]
+}
+
+export interface DniProviderTestResult {
+  ok: boolean
+  result: string
+  message: string
+}
+
 /** Tarifas del evento (GET /events/:id/pricing). */
 export interface EventPricing {
   eventId: number

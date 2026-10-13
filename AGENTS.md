@@ -69,6 +69,10 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
 - En el panel admin, respetar permisos: `admin.ts` exige rol OWNER/ADMIN; en
   usuarios, un admin no edita admins/owners y nadie se inhabilita a sí mismo.
 - Disciplinas pagadas (`isPaid`) requieren voucher en la inscripción.
+- Proveedores de DNI (`admin/integraciones.vue`, spec 003): Decolecta y API Perú se configuran desde el
+  panel y viven en la base de datos del backend, no en variables de entorno. El token se escribe en
+  un campo `password`, se envía una vez y **nunca** se guarda en cookies, `localStorage`, stores ni
+  consola; la pantalla solo muestra la máscara (`••••abcd`) que devuelve la API.
 - Eventos con cobro por salón o ciclo (`SportEvent.pricingMode = PER_GROUP`, spec 002): el delegado
   entra por el hub `inscripcion/grupo/[eventId].vue`, paga **una vez** el pago general y registra los
   equipos de cada disciplina con `/inscripcion/:disciplineId?groupId=`; el primer equipo por
@@ -196,7 +200,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (depende de `backend/specs/003-proveedores-dni`).
 
 ## Antes de dar por terminado
 
