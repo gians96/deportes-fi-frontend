@@ -18,14 +18,7 @@
         <p class="font-semibold text-white">{{ voucher.operationNumber || '—' }}</p>
       </div>
       <div class="flex items-end">
-        <a
-          :href="uploadUrl(config.public.apiBase, voucher.imageUrl)"
-          target="_blank"
-          rel="noopener"
-          class="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-300 hover:text-sky-200"
-        >
-          <ReceiptText class="h-4 w-4" /> Ver comprobante
-        </a>
+        <VoucherLink :voucher="voucher" :title="title" />
       </div>
     </div>
 
@@ -62,10 +55,9 @@
 </template>
 
 <script setup lang="ts">
-import { ReceiptText } from 'lucide-vue-next'
 import type { GroupVoucher } from '~/types/domain'
 import { formatCurrency } from '~/utils/format'
-import { apiMessage, uploadUrl } from '~/utils/groups'
+import { apiMessage } from '~/utils/groups'
 
 const props = defineProps<{
   voucher: GroupVoucher
@@ -76,7 +68,6 @@ const props = defineProps<{
 const emit = defineEmits<{ replaced: [] }>()
 
 const api = useApi()
-const config = useRuntimeConfig()
 
 const operationNumber = ref('')
 const file = ref<File | null>(null)

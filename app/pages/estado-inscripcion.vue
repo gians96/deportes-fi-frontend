@@ -227,6 +227,9 @@
               class="max-h-80 w-full object-contain"
             />
           </div>
+          <div v-if="detailTeam.voucher.imageUrl" class="mt-2">
+            <VoucherLink :voucher="detailTeam.voucher" label="Ampliar comprobante" />
+          </div>
           <div v-else class="mt-4 rounded-lg bg-oscuro-900/70 px-3 py-2 text-sm text-oscuro-300">
             No hay imagen de voucher adjunta.
           </div>
