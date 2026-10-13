@@ -233,36 +233,112 @@ export interface Voucher {
 
 export type DniProviderName = 'DECOLECTA' | 'APIPERU'
 
-export type CredentialState = 'UNVERIFIED' | 'VALID' | 'INVALID'
+/** ACTIVE se consulta; EXHAUSTED agotó su cupo; INVALID fue rechazado por el proveedor. */
+export type DniTokenState = 'ACTIVE' | 'EXHAUSTED' | 'INVALID'
+
+export type RenewalPeriod = 'DAILY' | 'MONTHLY' | 'YEARLY' | 'NONE'
+
+export type DniLookupResult =
+  | 'SUCCESS'
+  | 'CACHE'
+  | 'NOT_FOUND'
+  | 'EXHAUSTED'
+  | 'INVALID_TOKEN'
+  | 'ERROR'
+  | 'NO_TOKENS'
+
+export type DniLookupOrigin = 'PROFILE' | 'ROSTER' | 'PANEL'
 
 /** Origen de la clave que cifra los tokens en el servidor. */
 export type EncryptionKeySource = 'dedicated' | 'derived' | 'none'
 
-/** Proveedor de consulta de DNI configurado en la plataforma (nunca incluye el token). */
-export interface DniProviderConfig {
+/** Proveedor que el sistema sabe consultar. */
+export interface DniProviderInfo {
   provider: DniProviderName
   label: string
-  enabled: boolean
-  priority: number
+  defaultUrl: string
+  tokenHelpUrl: string
+}
+
+/** Token del pool de consulta de DNI tal como lo ve el panel: nunca incluye su valor, solo la máscara. */
+export interface DniToken {
+  id: number
+  provider: DniProviderName
+  providerLabel: string
+  name: string
+  tokenMask: string
   apiUrl: string
   defaultUrl: string
   customUrl: boolean
-  configured: boolean
-  tokenMask: string | null
-  state: CredentialState
+  priority: number
+  enabled: boolean
+  state: DniTokenState
+  /** Se usaría ahora mismo: activo, en estado ACTIVE y con cupo. */
+  available: boolean
+  queryLimit: number | null
+  queriesUsed: number
+  queriesRemaining: number | null
+  usagePercent: number | null
+  renewalPeriod: RenewalPeriod
+  renewsAt: string | null
   lastError: string | null
-  lastCheckedAt: string | null
+  lastUsedAt: string | null
+  exhaustedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
-export interface DniProvidersResponse {
+export interface DniTokensResponse {
   encryptionKey: EncryptionKeySource
-  providers: DniProviderConfig[]
+  providers: DniProviderInfo[]
+  tokens: DniToken[]
 }
 
-export interface DniProviderTestResult {
+export interface DniTokenTestResult {
   ok: boolean
   result: string
   message: string
+  token: DniToken
+}
+
+export interface DniUsage {
+  since: string
+  days: number
+  /** Una fila por día (hora de Lima) con el conteo de cada resultado. */
+  byDay: Array<{ date: string } & Partial<Record<DniLookupResult, number>>>
+  byToken: Array<{
+    tokenId: number | null
+    name: string
+    provider: DniProviderName | null
+    results: Partial<Record<DniLookupResult, number>>
+  }>
+}
+
+export interface DniLogEntry {
+  id: number
+  createdAt: string
+  /** DNI enmascarado (`76****07`). */
+  dni: string
+  provider: DniProviderName | null
+  token: string | null
+  result: DniLookupResult
+  httpStatus: number | null
+  durationMs: number | null
+  origin: DniLookupOrigin
+  detail: string | null
+}
+
+export interface DniLogsResponse {
+  data: DniLogEntry[]
+  meta: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+export interface DniManualLookup {
+  found: boolean
+  dni: string
+  fullName?: string
+  source?: 'CACHE' | 'PROVIDER'
+  provider?: DniProviderName
 }
 
 /** Tarifas del evento (GET /events/:id/pricing). */

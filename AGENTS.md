@@ -77,10 +77,12 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
 - Acceso por contraseña (spec 004): la contraseña solo se escribe en un `input` (con «Mostrar», «Generar» y «Copiar» en
   el panel de usuarios) y se envía una vez; **nunca** se guarda en cookies, `localStorage`, stores ni consola, y el
   campo se vacía tras enviar. El formulario de `login.vue` y el modal de contraseña no repiten el valor en la pantalla.
-- Proveedores de DNI (`admin/integraciones.vue`, spec 003): Decolecta y API Perú se configuran desde el
-  panel y viven en la base de datos del backend, no en variables de entorno. El token se escribe en
-  un campo `password`, se envía una vez y **nunca** se guarda en cookies, `localStorage`, stores ni
-  consola; la pantalla solo muestra la máscara (`••••abcd`) que devuelve la API.
+- Consultas de DNI (`admin/integraciones.vue`, spec 005, reemplaza a la 003): pool de tokens de Decolecta y API Perú
+  (varios por proveedor, con prioridad, cupo, renovación y estado) guardado en la base de datos del backend, no en
+  variables de entorno; incluye caché de 30 días, bitácora con DNI enmascarado, gráfico de uso y consulta manual. El
+  token se escribe en un campo `password`, se envía una vez y **nunca** se guarda en cookies, `localStorage`,
+  stores ni consola; la pantalla solo muestra la máscara (`••••abcd`) que devuelve la API. Solo Owner y
+  Administrador (el Tesorero no ve esta pantalla).
 - Eventos con cobro por salón o ciclo (`SportEvent.pricingMode = PER_GROUP`, spec 002): el delegado
   entra por el hub `inscripcion/grupo/[eventId].vue`, paga **una vez** el pago general y registra los
   equipos de cada disciplina con `/inscripcion/:disciplineId?groupId=`; el primer equipo por
@@ -208,7 +210,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (depende de `backend/specs/003-proveedores-dni`), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`).
 
 ## Antes de dar por terminado
 

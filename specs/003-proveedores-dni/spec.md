@@ -4,7 +4,8 @@
 
 **Created**: 2026-10-13
 
-**Status**: Implementada (2026-10-13)
+**Status**: Reemplazada por `005-pool-tokens-dni` (2026-10-14): una fila por proveedor se quedó corta; la pantalla se
+rehízo como pool de tokens. Se conserva como historial de la decisión.
 
 **Input**: "Que no esté dentro del environment, sino guardado por BD, que se muestre por la web y que
 sea editable y dinámico sin tener que recargar el environment."
