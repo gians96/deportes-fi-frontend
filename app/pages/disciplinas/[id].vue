@@ -31,7 +31,7 @@
         <div class="rounded-lg bg-oscuro-900/60 p-3">
           <p class="text-xs text-oscuro-400">Costo</p>
           <p class="font-semibold text-white">
-            {{ discipline.isPaid ? formatCurrency(discipline.cost) : 'Gratuito' }}
+            {{ costLabel }}
           </p>
         </div>
         <div class="rounded-lg bg-oscuro-900/60 p-3">
@@ -51,10 +51,10 @@
         </NuxtLink>
         <NuxtLink
           v-else-if="canRegister"
-          :to="`/inscripcion/${discipline.id}`"
+          :to="registerLink"
           class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 transition hover:bg-green-400"
         >
-          Inscribir equipo
+          {{ registerLabel }}
         </NuxtLink>
         <span
           v-else
@@ -121,7 +121,7 @@
 
 <script setup lang="ts">
 import { ChevronLeft } from 'lucide-vue-next'
-import type { Discipline, DisciplineTeamSummary } from '~/types/domain'
+import type { Discipline, DisciplineTeamSummary, PricingMode, SportEvent } from '~/types/domain'
 import { useAuthStore } from '~/stores/auth'
 import { formatCurrency, formatDateTime } from '~/utils/format'
 import { canUseParticipantType, participantTypeLabel } from '~/utils/participants'
@@ -140,6 +140,34 @@ const { data: discipline } = await useAsyncData<Discipline | null>(
     }
   },
   { default: () => null },
+)
+
+// Modo de cobro del evento: en "por salón o ciclo" la disciplina va dentro del pago del grupo.
+const pricingMode = ref<PricingMode | null>(null)
+onMounted(async () => {
+  if (!discipline.value) return
+  try {
+    const event = await api.get<SportEvent>(`/events/${discipline.value.eventId}`)
+    pricingMode.value = event.pricingMode ?? null
+  } catch {
+    pricingMode.value = null
+  }
+})
+
+const byGroup = computed(
+  () => pricingMode.value === 'PER_GROUP' && discipline.value?.participantType === 'STUDENT',
+)
+const costLabel = computed(() => {
+  if (byGroup.value) return 'Incluido en el pago del salón o ciclo'
+  return discipline.value?.isPaid ? formatCurrency(discipline.value.cost) : 'Gratuito'
+})
+const registerLink = computed(() =>
+  byGroup.value
+    ? `/inscripcion/grupo/${discipline.value?.eventId}`
+    : `/inscripcion/${discipline.value?.id}`,
+)
+const registerLabel = computed(() =>
+  byGroup.value ? 'Inscribir mi salón o ciclo' : 'Inscribir equipo',
 )
 
 const canRegister = computed(() => {

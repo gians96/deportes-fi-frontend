@@ -184,12 +184,12 @@
           <span
             class="rounded-lg px-2.5 py-1"
             :class="
-              team.discipline.isPaid
+              needsVoucher(team)
                 ? 'bg-yellow-500/10 text-yellow-300'
                 : 'bg-green-500/10 text-green-300'
             "
           >
-            {{ team.discipline.isPaid ? voucherBadge(team) : 'Gratuito' }}
+            {{ needsVoucher(team) ? voucherBadge(team) : 'Gratuito' }}
           </span>
           <span class="rounded-lg bg-oscuro-900/70 px-2.5 py-1 text-oscuro-300">
             Base: {{ team.discipline.minPlayers }}-{{ team.discipline.maxPlayers }}
@@ -217,8 +217,8 @@
           @click="openReview(team)"
         >
           <span class="flex items-center gap-2">
-            <component :is="team.discipline?.isPaid ? ReceiptText : Users" class="h-4 w-4" />
-            {{ team.discipline?.isPaid ? 'Revisar voucher' : 'Revisar equipo' }}
+            <component :is="needsVoucher(team) ? ReceiptText : Users" class="h-4 w-4" />
+            {{ needsVoucher(team) ? 'Revisar voucher' : 'Revisar equipo' }}
           </span>
           <ChevronRight class="h-4 w-4" />
         </button>
@@ -320,7 +320,7 @@
 
         <div class="space-y-4">
           <div
-            v-if="reviewTeam.discipline?.isPaid"
+            v-if="needsVoucher(reviewTeam)"
             class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4"
           >
             <div class="flex items-center justify-between gap-3">
@@ -387,7 +387,7 @@
       <template v-if="reviewTeam && reviewTeam.status === 'PENDING'" #footer>
         <div class="grid gap-3">
           <div
-            v-if="reviewTeam.discipline?.isPaid && reviewTeam.voucher?.status === 'PENDING'"
+            v-if="needsVoucher(reviewTeam) && reviewTeam.voucher?.status === 'PENDING'"
             class="grid gap-2 sm:grid-cols-[1fr_auto_auto]"
           >
             <input
@@ -406,12 +406,12 @@
               :disabled="!reviewRules.ok"
               @click="validateVoucher"
             >
-              Validar voucher y aprobar
+              {{ reviewTeam.groupId ? 'Validar pago del salón y aprobar equipos' : 'Validar voucher y aprobar' }}
             </button>
           </div>
 
           <button
-            v-else-if="!reviewTeam.discipline?.isPaid || reviewTeam.voucher?.status === 'VALIDATED'"
+            v-else-if="!needsVoucher(reviewTeam) || reviewTeam.voucher?.status === 'VALIDATED'"
             class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-50"
             :disabled="!reviewRules.ok"
             @click="approveReview"
@@ -420,7 +420,7 @@
           </button>
 
           <div
-            v-if="!(reviewTeam.discipline?.isPaid && reviewTeam.voucher?.status === 'PENDING')"
+            v-if="!(needsVoucher(reviewTeam) && reviewTeam.voucher?.status === 'PENDING')"
             class="grid gap-2 sm:grid-cols-[1fr_auto]"
           >
             <input
@@ -708,6 +708,11 @@ function teamCycleSection(team: Team) {
 
 function teamPhoneLabel(team: Team) {
   return team.phone?.trim() || 'Sin teléfono'
+}
+
+/** De pago: la disciplina cobra por equipo o el equipo se paga con el comprobante de su grupo. */
+function needsVoucher(team: Team) {
+  return !!team.discipline?.isPaid || (team.groupId !== null && team.groupId !== undefined)
 }
 
 function voucherBadge(team: Team) {

@@ -20,6 +20,14 @@ export type RegistrationStatus =
 
 export type VoucherStatus = 'PENDING' | 'VALIDATED' | 'REJECTED'
 
+/** Cómo cobra un evento: por disciplina (clásico) o por salón / ciclo completo. */
+export type PricingMode = 'PER_DISCIPLINE' | 'PER_GROUP'
+
+export type GroupScope = 'SECTION' | 'CYCLE'
+
+/** TEAM = un solo equipo; BASE = pago general de un grupo; EXTRA = equipo adicional. */
+export type VoucherKind = 'TEAM' | 'BASE' | 'EXTRA'
+
 export type MatchStatus =
   | 'PENDING'
   | 'IN_PROGRESS'
@@ -62,6 +70,7 @@ export interface SportEvent {
   startDate: string
   endDate: string
   isOpen: boolean
+  pricingMode?: PricingMode
   disciplinesCount?: number
 }
 
@@ -136,6 +145,8 @@ export interface Participant {
   gender: Gender
   isDelegate: boolean
   countsAsPlayer: boolean
+  /** Capitán/a del equipo (eventos que cobran por salón o ciclo). */
+  isCaptain?: boolean
   userId?: number | null
 }
 
@@ -173,12 +184,21 @@ export interface Team {
   rejectionReason?: string | null
   participants: Participant[]
   voucher?: Voucher | null
+  /** Salón o ciclo que paga el equipo (null en el flujo por disciplina). */
+  groupId?: number | null
+  /** 1 = incluido en el pago general; 2 o más = equipo adicional. */
+  slot?: number | null
   createdAt: string
 }
 
 export interface Voucher {
   id: number
-  teamId: number
+  /** null en el pago general o adicional de un salón o ciclo. */
+  teamId: number | null
+  kind?: VoucherKind
+  groupId?: number | null
+  groupLabel?: string | null
+  teams?: { id: number; name: string; disciplineName: string; slot: number | null; status: RegistrationStatus }[]
   teamName?: string
   cycle?: string | null
   section?: string | null
@@ -199,6 +219,63 @@ export interface Voucher {
   schoolName?: string
   participantsCount?: number
   participants?: Participant[]
+}
+
+/** Tarifas del evento (GET /events/:id/pricing). */
+export interface EventPricing {
+  eventId: number
+  pricingMode: PricingMode
+  sectionBase: number
+  cycleBase: number
+  sectionExtra: number
+  cycleExtra: number
+}
+
+export interface GroupVoucher {
+  id: number
+  kind: VoucherKind
+  status: VoucherStatus
+  amount: number
+  operationNumber: string | null
+  imageUrl: string
+  rejectionReason: string | null
+}
+
+export interface GroupTeam {
+  id: number
+  name: string
+  slot: number | null
+  status: RegistrationStatus
+  voucherId: number | null
+}
+
+export interface GroupDiscipline {
+  disciplineId: number
+  name: string
+  teams: GroupTeam[]
+}
+
+/** Salón o ciclo completo que paga (GET /groups). */
+export interface ClassGroup {
+  id: number
+  eventId: number
+  scope: GroupScope
+  label: string
+  school: { id: number; name: string }
+  cycle: string
+  section: string
+  delegate: { id: number; fullName: string }
+  baseVoucher: GroupVoucher | null
+  disciplines: GroupDiscipline[]
+  extraVouchers: (GroupVoucher & { teamIds: number[] })[]
+}
+
+/** Respuesta de validar un pago de grupo: equipos aprobados y omitidos con su motivo. */
+export interface GroupVoucherValidation {
+  id: number
+  status: VoucherStatus
+  approvedTeamIds: number[]
+  skipped: { teamId: number; reason: string }[]
 }
 
 export interface StandingRow {

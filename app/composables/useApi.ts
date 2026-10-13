@@ -48,8 +48,13 @@ export function useApi() {
       request<T>(path, { method: 'POST', body }),
     patch: <T>(path: string, body?: unknown) =>
       request<T>(path, { method: 'PATCH', body }),
+    put: <T>(path: string, body?: unknown) =>
+      request<T>(path, { method: 'PUT', body }),
     del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-    upload: <T>(path: string, formData: FormData) =>
-      request<T>(path, { method: 'POST', formData }),
+    upload: <T>(
+      path: string,
+      formData: FormData,
+      method: 'POST' | 'PATCH' | 'PUT' = 'POST',
+    ) => request<T>(path, { method, formData }),
   }
 }

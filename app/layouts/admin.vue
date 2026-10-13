@@ -102,6 +102,7 @@ import {
   Power,
   Building2,
   GraduationCap,
+  Layers,
 } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
 
@@ -115,6 +116,7 @@ const adminMenuItems = [
   { to: '/admin/disciplinas', label: 'Disciplinas', icon: Trophy },
   { to: '/admin/programacion', label: 'Programación', icon: CalendarClock },
   { to: '/admin/inscripciones', label: 'Equipos', icon: Users },
+  { to: '/admin/grupos', label: 'Salones y ciclos', icon: Layers },
   { to: '/admin/usuarios', label: 'Usuarios', icon: Building2 },
 ]
 

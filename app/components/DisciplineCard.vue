@@ -15,12 +15,18 @@
       <span
         class="rounded-md border px-2 py-1 text-xs font-semibold"
         :class="
-          discipline.isPaid
-            ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
-            : 'border-green-500/30 bg-green-500/10 text-green-300'
+          includedInGroup || !discipline.isPaid
+            ? 'border-green-500/30 bg-green-500/10 text-green-300'
+            : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
         "
       >
-        {{ discipline.isPaid ? formatCurrency(discipline.cost) : 'Gratuito' }}
+        {{
+          includedInGroup
+            ? 'Incluido en el pago del salón'
+            : discipline.isPaid
+              ? formatCurrency(discipline.cost)
+              : 'Gratuito'
+        }}
       </span>
     </div>
 
@@ -58,7 +64,8 @@ import type { Discipline } from '~/types/domain'
 import { formatCurrency, formatDateTime } from '~/utils/format'
 import { participantTypeLabel } from '~/utils/participants'
 
-const props = defineProps<{ discipline: Discipline }>()
+/** `includedInGroup`: el evento cobra por salón o ciclo y esta disciplina va dentro de ese pago. */
+const props = defineProps<{ discipline: Discipline; includedInGroup?: boolean }>()
 
 const modalityLabel = computed(() =>
   props.discipline.modality === 'TEAM' ? 'Por equipos' : 'Individual',

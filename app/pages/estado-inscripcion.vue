@@ -116,6 +116,13 @@
             {{ team.delegate?.id === auth.user?.id ? 'Soy delegado' : 'Jugador inscrito' }}
           </span>
           <span
+            v-if="paysByGroup(team)"
+            class="rounded-lg bg-sky-500/10 px-2.5 py-1 text-sky-300"
+          >
+            {{ team.slot && team.slot > 1 ? 'Equipo adicional' : 'Pago del salón o ciclo' }}
+          </span>
+          <span
+            v-else
             class="rounded-lg px-2.5 py-1"
             :class="
               team.discipline?.isPaid
@@ -139,6 +146,14 @@
         >
           {{ team.rejectionReason }}
         </p>
+
+        <NuxtLink
+          v-if="paysByGroup(team) && team.discipline?.event?.id && team.delegate?.id === auth.user?.id"
+          :to="`/inscripcion/grupo/${team.discipline.event.id}`"
+          class="mb-3 text-center text-sm font-semibold text-sky-300 hover:text-sky-200"
+        >
+          Gestionar mi salón o ciclo
+        </NuxtLink>
 
         <button
           class="mt-auto flex w-full items-center justify-between rounded-2xl border border-oscuro-700 bg-oscuro-900/50 px-4 py-2.5 text-sm font-semibold text-oscuro-300 transition hover:border-green-500/40 hover:text-green-300"
@@ -254,6 +269,7 @@ import { ChevronRight } from 'lucide-vue-next'
 import type { RegistrationStatus, Team } from '~/types/domain'
 import { useAuthStore } from '~/stores/auth'
 import { formatCurrency, formatDate } from '~/utils/format'
+import { paysByGroup } from '~/utils/groups'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -307,13 +323,18 @@ watch(eventFilter, () => {
 const filteredTeams = computed(() =>
   teams.value.filter((team) => {
     if (statusFilter.value !== 'ALL' && team.status !== statusFilter.value) return false
-    if (paymentFilter.value === 'FREE' && team.discipline?.isPaid) return false
-    if (paymentFilter.value === 'PAID' && !team.discipline?.isPaid) return false
+    if (paymentFilter.value === 'FREE' && isPaidTeam(team)) return false
+    if (paymentFilter.value === 'PAID' && !isPaidTeam(team)) return false
     if (eventFilter.value && team.discipline?.event?.id !== eventFilter.value) return false
     if (disciplineFilter.value && team.discipline?.id !== disciplineFilter.value) return false
     return true
   }),
 )
+
+/** De pago: la disciplina cobra por equipo o el equipo se paga con el comprobante de su grupo. */
+function isPaidTeam(team: Team) {
+  return !!team.discipline?.isPaid || paysByGroup(team)
+}
 
 function resolveUrl(path: string) {
   if (path.startsWith('http')) return path
@@ -326,7 +347,7 @@ function teamCycleSection(team: Team) {
 }
 
 function voucherLabel(team: Team) {
-  if (!team.voucher) return team.discipline?.isPaid ? 'Pendiente' : 'No aplica'
+  if (!team.voucher) return isPaidTeam(team) ? 'Pendiente' : 'No aplica'
   if (team.voucher.status === 'VALIDATED') return 'Validado'
   if (team.voucher.status === 'REJECTED') return 'Rechazado'
   return 'Pendiente'

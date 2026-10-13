@@ -85,6 +85,13 @@
             {{ event.isOpen ? 'Abierto' : 'Cerrado' }}
           </span>
           <button
+            class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/10"
+            @click="openPricing(event)"
+          >
+            <Wallet class="h-3.5 w-3.5" />
+            Cobro
+          </button>
+          <button
             class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/10"
             @click="openTokens(event)"
           >
@@ -106,6 +113,58 @@
         </div>
       </div>
     </div>
+
+    <!-- Cobro: por disciplina o por salón / ciclo -->
+    <AppModal v-model="pricingOpen" :title="`Cobro · ${pricingEvent?.name ?? ''}`" size="2xl">
+      <form class="space-y-4" @submit.prevent="savePricing">
+        <div class="grid gap-2 sm:grid-cols-2">
+          <button
+            v-for="option in pricingModes"
+            :key="option.value"
+            type="button"
+            class="rounded-xl border p-4 text-left transition"
+            :class="
+              pricingForm.pricingMode === option.value
+                ? 'border-green-500/50 bg-green-500/10'
+                : 'border-oscuro-700 bg-oscuro-900/60 hover:border-oscuro-500'
+            "
+            @click="pricingForm.pricingMode = option.value"
+          >
+            <p class="font-semibold text-white">{{ option.label }}</p>
+            <p class="mt-1 text-xs text-oscuro-300">{{ option.hint }}</p>
+          </button>
+        </div>
+
+        <div v-if="pricingForm.pricingMode === 'PER_GROUP'" class="grid gap-4 sm:grid-cols-2">
+          <label v-for="field in pricingFields" :key="field.key" class="block">
+            <span class="text-sm text-oscuro-200">{{ field.label }} (S/)</span>
+            <input
+              v-model.number="pricingForm[field.key]"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              class="input"
+            />
+          </label>
+          <p class="text-xs text-oscuro-400 sm:col-span-2">
+            Deja las disciplinas de estudiantes como gratuitas: su costo va dentro del pago del
+            salón o ciclo. Una vez inscritos salones o ciclos no se puede volver al cobro por
+            disciplina; cambiar las tarifas no modifica los comprobantes ya enviados.
+          </p>
+        </div>
+
+        <p v-if="pricingError" class="text-sm text-red-400">{{ pricingError }}</p>
+        <p v-if="pricingSaved" class="text-sm text-green-400">Cobro guardado.</p>
+        <button
+          type="submit"
+          class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-60"
+          :disabled="pricingSaving"
+        >
+          {{ pricingSaving ? 'Guardando…' : 'Guardar cobro' }}
+        </button>
+      </form>
+    </AppModal>
 
     <!-- Editar evento -->
     <AppModal v-model="editOpen" title="Editar evento" size="4xl">
@@ -363,11 +422,13 @@
 </template>
 
 <script setup lang="ts">
-import { AlertTriangle, Check, Copy, KeyRound } from 'lucide-vue-next'
+import { AlertTriangle, Check, Copy, KeyRound, Wallet } from 'lucide-vue-next'
 import type {
   CreatedEventApiToken,
   EventApiToken,
   EventApiTokenStatus,
+  EventPricing,
+  PricingMode,
   SportEvent,
 } from '~/types/domain'
 import { formatDateTime, formatDateUtc } from '~/utils/format'
@@ -549,6 +610,74 @@ async function create() {
 // --- Tokens API del evento (integración con el congreso) ---
 // El token en claro solo vive en `createdToken` mientras se muestra: nunca se
 // guarda en cookies, storage ni stores, y se borra al descartarlo o cerrar.
+const pricingOpen = ref(false)
+const pricingEvent = ref<SportEvent | null>(null)
+const pricingSaving = ref(false)
+const pricingSaved = ref(false)
+const pricingError = ref('')
+const pricingForm = reactive({
+  pricingMode: 'PER_DISCIPLINE' as PricingMode,
+  sectionBase: 0,
+  cycleBase: 0,
+  sectionExtra: 0,
+  cycleExtra: 0,
+})
+const pricingModes: { value: PricingMode; label: string; hint: string }[] = [
+  {
+    value: 'PER_DISCIPLINE',
+    label: 'Por disciplina',
+    hint: 'Cada equipo paga el costo de su disciplina (comportamiento de siempre).',
+  },
+  {
+    value: 'PER_GROUP',
+    label: 'Por salón o ciclo completo',
+    hint: 'Un pago general cubre un equipo por disciplina; cada equipo adicional paga aparte.',
+  },
+]
+const pricingFields: {
+  key: 'sectionBase' | 'cycleBase' | 'sectionExtra' | 'cycleExtra'
+  label: string
+}[] = [
+  { key: 'sectionBase', label: 'Pago general por salón' },
+  { key: 'cycleBase', label: 'Pago general por ciclo completo' },
+  { key: 'sectionExtra', label: 'Equipo adicional (salón)' },
+  { key: 'cycleExtra', label: 'Equipo adicional (ciclo completo)' },
+]
+
+async function openPricing(event: SportEvent) {
+  pricingEvent.value = event
+  pricingError.value = ''
+  pricingSaved.value = false
+  pricingOpen.value = true
+  try {
+    Object.assign(pricingForm, await api.get<EventPricing>(`/events/${event.id}/pricing`))
+  } catch (err) {
+    pricingError.value = apiErrorMessage(err, 'No se pudo cargar el cobro del evento.')
+  }
+}
+
+async function savePricing() {
+  if (!pricingEvent.value) return
+  pricingSaving.value = true
+  pricingError.value = ''
+  pricingSaved.value = false
+  try {
+    await api.put<EventPricing>(`/events/${pricingEvent.value.id}/pricing`, {
+      pricingMode: pricingForm.pricingMode,
+      sectionBase: Number(pricingForm.sectionBase) || 0,
+      cycleBase: Number(pricingForm.cycleBase) || 0,
+      sectionExtra: Number(pricingForm.sectionExtra) || 0,
+      cycleExtra: Number(pricingForm.cycleExtra) || 0,
+    })
+    pricingSaved.value = true
+    await load()
+  } catch (err) {
+    pricingError.value = apiErrorMessage(err, 'No se pudo guardar el cobro.')
+  } finally {
+    pricingSaving.value = false
+  }
+}
+
 const tokensOpen = ref(false)
 const tokensEvent = ref<SportEvent | null>(null)
 const tokens = ref<EventApiToken[]>([])
