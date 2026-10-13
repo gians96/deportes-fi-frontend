@@ -69,6 +69,13 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
 - En el panel admin, respetar permisos: `admin.ts` exige rol OWNER/ADMIN; en
   usuarios, un admin no edita admins/owners y nadie se inhabilita a sí mismo.
 - Disciplinas pagadas (`isPaid`) requieren voucher en la inscripción.
+- Eventos con cobro por salón o ciclo (`SportEvent.pricingMode = PER_GROUP`, spec 002): el delegado
+  entra por el hub `inscripcion/grupo/[eventId].vue`, paga **una vez** el pago general y registra los
+  equipos de cada disciplina con `/inscripcion/:disciplineId?groupId=`; el primer equipo por
+  disciplina no lleva voucher y los adicionales sí. Capitán/a y DNI son obligatorios; ciclo y
+  sección son texto libre (el servidor los normaliza). Los montos y los cupos los decide el backend;
+  la pantalla solo los muestra. Los equipos de un grupo se tratan como "de pago" con el comprobante
+  del grupo (`paysByGroup` en `utils/groups.ts`), no por `discipline.isPaid`.
 - Tokens de integración por evento (`admin/eventos.vue` → "Tokens API"): el
   valor completo `dfi_…` solo se muestra una vez tras crearlo; nunca guardarlo
   en cookies, `localStorage`, stores ni consola.
@@ -189,7 +196,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`).
 
 ## Antes de dar por terminado
 
