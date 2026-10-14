@@ -224,7 +224,7 @@
                 {{ d.isPaid ? formatCurrency(d.cost) : 'Gratuito' }}
               </p>
               <p class="mt-1 text-xs text-oscuro-500">
-                Cierre: {{ formatDateTime(d.registrationDeadline) }} Â·
+                Cierre: {{ formatDateTime(d.registrationDeadline) }} ·
                 {{ d.format === 'POINTS' ? 'Puntos' : 'Eliminacion' }}
               </p>
             </div>
