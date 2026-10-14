@@ -17,7 +17,80 @@
 
     <p v-if="error" class="mt-4 text-sm text-red-400">{{ error }}</p>
 
-    <div class="mt-6 overflow-x-auto rounded-xl border border-oscuro-700">
+    <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="block sm:col-span-2">
+        <span class="text-xs text-oscuro-300">Buscar</span>
+        <input
+          v-model="filters.q"
+          type="search"
+          class="input"
+          placeholder="Nombre, correo, código de estudiante o DNI"
+          autocomplete="off"
+        />
+      </label>
+      <label class="block">
+        <span class="text-xs text-oscuro-300">Rol</span>
+        <select v-model="filters.role" class="input">
+          <option value="ALL">Todos ({{ users.length }})</option>
+          <option v-for="option in ROLE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }} ({{ roleCounts[option.value] ?? 0 }})
+          </option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-xs text-oscuro-300">Estado</span>
+        <select v-model="filters.status" class="input">
+          <option value="ALL">Todos</option>
+          <option value="ACTIVE">Activos</option>
+          <option value="INACTIVE">Inhabilitados</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-xs text-oscuro-300">Acceso</span>
+        <select v-model="filters.access" class="input">
+          <option value="ALL">Todos</option>
+          <option value="GOOGLE">Solo Google</option>
+          <option value="PASSWORD">Contraseña o Google</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-xs text-oscuro-300">Facultad</span>
+        <select v-model.number="filters.facultyId" class="input">
+          <option :value="0">Todas</option>
+          <option v-for="faculty in faculties" :key="faculty.id" :value="faculty.id">
+            {{ faculty.name }}
+          </option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-xs text-oscuro-300">Escuela profesional</span>
+        <select v-model.number="filters.schoolId" class="input" :disabled="!filters.facultyId">
+          <option :value="0">{{ filters.facultyId ? 'Todas' : 'Elige una facultad' }}</option>
+          <option v-for="school in schoolsOf(filters.facultyId)" :key="school.id" :value="school.id">
+            {{ school.name }}
+          </option>
+        </select>
+      </label>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-oscuro-300">
+      <p>
+        <template v-if="hasFilters">
+          <strong class="text-white">{{ filtered.length }}</strong> de {{ users.length }} usuarios coinciden
+        </template>
+        <template v-else>{{ users.length }} usuarios</template>
+      </p>
+      <button
+        v-if="hasFilters"
+        type="button"
+        class="rounded-lg bg-oscuro-850 px-3 py-1.5 font-semibold text-sky-300 hover:bg-oscuro-800 hover:text-sky-200"
+        @click="clearFilters"
+      >
+        Limpiar filtros
+      </button>
+    </div>
+
+    <div class="mt-3 overflow-x-auto rounded-xl border border-oscuro-700">
       <table class="w-full text-left text-sm">
         <thead class="bg-oscuro-800 text-oscuro-300">
           <tr>
@@ -31,7 +104,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-oscuro-700 bg-oscuro-850">
-          <tr v-for="u in users" :key="u.id">
+          <tr v-for="u in visible" :key="u.id">
             <td class="px-4 py-3 font-semibold text-white">{{ u.fullName }}</td>
             <td class="px-4 py-3 text-oscuro-300">{{ u.email }}</td>
             <td class="px-4 py-3 text-oscuro-300">
@@ -106,9 +179,32 @@
               </div>
             </td>
           </tr>
+          <tr v-if="!visible.length">
+            <td colspan="7" class="px-4 py-10 text-center text-oscuro-300">
+              <template v-if="!loaded">Cargando usuarios…</template>
+              <template v-else-if="!users.length">Todavía no hay usuarios.</template>
+              <template v-else>
+                Ningún usuario coincide con los filtros.
+                <button
+                  type="button"
+                  class="ml-1 font-semibold text-sky-300 hover:text-sky-200"
+                  @click="clearFilters"
+                >
+                  Limpiar filtros
+                </button>
+              </template>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
+
+    <PaginationBar
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="filtered.length"
+      label="usuarios"
+    />
 
     <!-- Crear usuario -->
     <AppModal v-model="createOpen" title="Nuevo usuario">
@@ -383,15 +479,168 @@
 <script setup lang="ts">
 import type { AuthUser } from '~/types/domain'
 import { useAuthStore } from '~/stores/auth'
+import { PAGE_SIZES, clampPage } from '~/utils/pagination'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const api = useApi()
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 const { faculties, load: loadFaculties } = useFaculties()
 const users = ref<AuthUser[]>([])
+const loaded = ref(false)
 const error = ref('')
 const modalError = ref('')
+
+// --- Filtros y paginación ---
+// `GET /users` devuelve todos los usuarios, así que se filtra y se pagina aquí. La vista (búsqueda, filtros,
+// página) se refleja en la URL para que recargar o volver atrás la conserve y se pueda compartir.
+type RoleFilter = AuthUser['role'] | 'ALL'
+type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE'
+type AccessFilter = 'ALL' | 'GOOGLE' | 'PASSWORD'
+
+const ROLE_OPTIONS: { value: AuthUser['role']; label: string }[] = [
+  { value: 'OWNER_SYSTEM', label: 'Owner' },
+  { value: 'ADMIN_SYSTEM', label: 'Administrador' },
+  { value: 'TREASURER', label: 'Tesorero' },
+  { value: 'REFEREE', label: 'Árbitro' },
+  { value: 'STUDENT', label: 'Estudiante' },
+  { value: 'OTHER', label: 'Otro' },
+]
+const DEFAULT_PAGE_SIZE = 25
+
+function queryText(key: string): string {
+  const value = route.query[key]
+  return typeof value === 'string' ? value : ''
+}
+
+function queryInt(key: string): number {
+  const value = Number(queryText(key))
+  return Number.isInteger(value) && value > 0 ? value : 0
+}
+
+function roleFromQuery(): RoleFilter {
+  const value = queryText('rol')
+  return ROLE_OPTIONS.some((option) => option.value === value) ? (value as AuthUser['role']) : 'ALL'
+}
+
+function statusFromQuery(): StatusFilter {
+  const value = queryText('estado')
+  return value === 'activos' ? 'ACTIVE' : value === 'inhabilitados' ? 'INACTIVE' : 'ALL'
+}
+
+function accessFromQuery(): AccessFilter {
+  const value = queryText('acceso')
+  return value === 'google' ? 'GOOGLE' : value === 'contrasena' ? 'PASSWORD' : 'ALL'
+}
+
+const filters = reactive({
+  q: queryText('q'),
+  role: roleFromQuery(),
+  status: statusFromQuery(),
+  access: accessFromQuery(),
+  facultyId: queryInt('facultad'),
+  schoolId: queryInt('escuela'),
+})
+const page = ref(queryInt('pagina') || 1)
+const pageSize = ref(
+  (PAGE_SIZES as readonly number[]).includes(queryInt('por')) ? queryInt('por') : DEFAULT_PAGE_SIZE,
+)
+
+/** Sin tildes y en minúsculas, para buscar «jose» y encontrar «José». */
+function normalize(value: string): string {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+
+const searchIndex = computed(
+  () =>
+    new Map(
+      users.value.map((u) => [
+        u.id,
+        normalize([u.fullName, u.email, u.studentCode, u.dni].filter(Boolean).join(' ')),
+      ]),
+    ),
+)
+
+const roleCounts = computed(() => {
+  const counts: Partial<Record<AuthUser['role'], number>> = {}
+  for (const u of users.value) counts[u.role] = (counts[u.role] ?? 0) + 1
+  return counts
+})
+
+const filtered = computed(() => {
+  const terms = normalize(filters.q).split(/\s+/).filter(Boolean)
+  return users.value.filter((u) => {
+    if (filters.role !== 'ALL' && u.role !== filters.role) return false
+    if (filters.status === 'ACTIVE' && !u.isActive) return false
+    if (filters.status === 'INACTIVE' && u.isActive) return false
+    if (filters.access === 'GOOGLE' && u.hasPassword) return false
+    if (filters.access === 'PASSWORD' && !u.hasPassword) return false
+    if (filters.facultyId && u.facultyId !== filters.facultyId) return false
+    if (filters.schoolId && u.schoolId !== filters.schoolId) return false
+    const haystack = searchIndex.value.get(u.id) ?? ''
+    return terms.every((term) => haystack.includes(term))
+  })
+})
+
+const visible = computed(() =>
+  filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
+)
+
+const hasFilters = computed(
+  () =>
+    !!filters.q.trim() ||
+    filters.role !== 'ALL' ||
+    filters.status !== 'ALL' ||
+    filters.access !== 'ALL' ||
+    filters.facultyId !== 0 ||
+    filters.schoolId !== 0,
+)
+
+function clearFilters() {
+  filters.q = ''
+  filters.role = 'ALL'
+  filters.status = 'ALL'
+  filters.access = 'ALL'
+  filters.facultyId = 0
+  filters.schoolId = 0
+}
+
+// Cualquier cambio de filtro o de tamaño de página vuelve a la primera página.
+watch(
+  () => ({ ...filters }),
+  () => {
+    page.value = 1
+  },
+)
+watch(pageSize, () => {
+  page.value = 1
+})
+watch(
+  () => filters.facultyId,
+  () => {
+    filters.schoolId = 0
+  },
+)
+// Si la lista se acorta (filtros, o un usuario menos tras recargar), la página no puede quedar fuera de rango.
+watch([() => filtered.value.length, loaded], () => {
+  if (loaded.value) page.value = clampPage(page.value, filtered.value.length, pageSize.value)
+})
+
+function syncQuery() {
+  const query: Record<string, string> = {}
+  if (filters.q.trim()) query.q = filters.q.trim()
+  if (filters.role !== 'ALL') query.rol = filters.role
+  if (filters.status !== 'ALL') query.estado = filters.status === 'ACTIVE' ? 'activos' : 'inhabilitados'
+  if (filters.access !== 'ALL') query.acceso = filters.access === 'GOOGLE' ? 'google' : 'contrasena'
+  if (filters.facultyId) query.facultad = String(filters.facultyId)
+  if (filters.schoolId) query.escuela = String(filters.schoolId)
+  if (page.value > 1) query.pagina = String(page.value)
+  if (pageSize.value !== DEFAULT_PAGE_SIZE) query.por = String(pageSize.value)
+  void router.replace({ query })
+}
+watch([filters, page, pageSize], syncQuery, { deep: true })
 
 function facultyName(id: number) {
   return faculties.value.find((f) => f.id === id)?.name ?? `#${id}`
@@ -438,6 +687,8 @@ async function load() {
     users.value = await api.get<AuthUser[]>('/users')
   } catch {
     users.value = []
+  } finally {
+    loaded.value = true
   }
 }
 
