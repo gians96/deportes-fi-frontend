@@ -4,9 +4,10 @@
   --color-oscuro-50: #e5e7e9;
   --color-oscuro-100: #cfd3d6;
   --color-oscuro-200: #a3aab0;
-  --color-oscuro-300: #77808a;
-  --color-oscuro-400: #4b5663;
-  --color-oscuro-500: #2c3745;
+  /* 300-500 se usan casi solo como color de texto: contraste >= 4.5:1 sobre 800/900 (antes 400 y 500 daban 2.6 y 1.6) */
+  --color-oscuro-300: #939da9;
+  --color-oscuro-400: #838d99;
+  --color-oscuro-500: #77808a;
   --color-oscuro-600: #1d262f;
   --color-oscuro-700: #151d24;
   --color-oscuro-800: #0f161b;
