@@ -3,6 +3,8 @@ import type {
   EventPricing,
   GroupScope,
   GroupTeam,
+  GroupVoucher,
+  RegistrationStatus,
   Team,
 } from '~/types/domain'
 
@@ -35,6 +37,72 @@ export function isActiveGroup(group: Pick<ClassGroup, 'baseVoucher' | 'disciplin
   return group.disciplines.some((discipline) =>
     discipline.teams.some((team) => team.status === 'PENDING' || team.status === 'APPROVED'),
   )
+}
+
+/** Equipo de un grupo en una lista: lo que da `GET /groups` más el detalle de `GET /registrations` si se cargó. */
+export interface GroupTeamRow {
+  id: number
+  name: string
+  discipline: string
+  status: RegistrationStatus
+  voucherId: number | null
+  detail?: Team
+}
+
+export function groupTeamRows(group: ClassGroup, teamsById: Map<number, Team>): GroupTeamRow[] {
+  return group.disciplines.flatMap((discipline) =>
+    discipline.teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      discipline: discipline.name,
+      status: team.status,
+      voucherId: team.voucherId,
+      detail: teamsById.get(team.id),
+    })),
+  )
+}
+
+/** Comprobante que cubre a un equipo del grupo y cómo se llama esa cobertura (pack o adicional). */
+export function coverageOf(
+  group: ClassGroup,
+  teamId: number,
+): { voucher: GroupVoucher; label: string } | null {
+  const team = group.disciplines.flatMap((discipline) => discipline.teams).find((t) => t.id === teamId)
+  if (!team || team.voucherId === null) return null
+  if (group.baseVoucher && team.voucherId === group.baseVoucher.id) {
+    return { voucher: group.baseVoucher, label: group.scope === 'CYCLE' ? 'Pack del ciclo' : 'Pack del salón' }
+  }
+  const extra = group.extraVouchers.find((voucher) => voucher.id === team.voucherId)
+  return extra ? { voucher: extra, label: 'Equipo adicional' } : null
+}
+
+export type GroupAttention = 'PENDING' | 'REJECTED' | 'DRAFT' | 'OK'
+
+/** Orden de la lista de salones: primero lo que pide una acción del administrador. */
+export const ATTENTION_ORDER: Record<GroupAttention, number> = {
+  PENDING: 0,
+  REJECTED: 1,
+  DRAFT: 2,
+  OK: 3,
+}
+
+/**
+ * Qué necesita un salón o ciclo: algo por revisar (equipo o pago pendiente), un pago rechazado (espera al
+ * delegado), solo borradores sin enviar, o nada (al día). Ordena la lista y da el aviso de la cabecera.
+ */
+export function groupAttention(
+  group: Pick<ClassGroup, 'baseVoucher' | 'extraVouchers' | 'disciplines'>,
+): GroupAttention {
+  const teams = group.disciplines.flatMap((discipline) => discipline.teams)
+  const vouchers = [group.baseVoucher, ...group.extraVouchers].filter(
+    (voucher): voucher is NonNullable<typeof voucher> => !!voucher,
+  )
+  if (teams.some((team) => team.status === 'PENDING') || vouchers.some((v) => v.status === 'PENDING')) {
+    return 'PENDING'
+  }
+  if (vouchers.some((voucher) => voucher.status === 'REJECTED')) return 'REJECTED'
+  if (teams.some((team) => team.status === 'DRAFT')) return 'DRAFT'
+  return 'OK'
 }
 
 /** Equipos vigentes (con cupo) de un grupo en una disciplina. */

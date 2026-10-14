@@ -95,13 +95,76 @@
       </label>
     </div>
 
-    <p v-if="!filtered.length" class="mt-8 text-center text-sm text-oscuro-400">
+    <p v-if="!visibleCount" class="mt-8 text-center text-sm text-oscuro-400">
       No hay equipos que coincidan con los filtros.
     </p>
 
-    <div class="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      v-if="notice"
+      class="mt-4 rounded-xl border px-4 py-3 text-sm"
+      :class="
+        notice.kind === 'error'
+          ? 'border-red-500/30 bg-red-500/10 text-red-200'
+          : 'border-green-500/30 bg-green-500/10 text-green-200'
+      "
+    >
+      <div class="flex items-start justify-between gap-3">
+        <p>{{ notice.text }}</p>
+        <button type="button" class="shrink-0 text-xs font-semibold underline" @click="notice = null">Cerrar</button>
+      </div>
+      <ul v-if="notice.details.length" class="mt-2 list-disc space-y-1 pl-5 text-xs">
+        <li v-for="detail in notice.details" :key="detail">{{ detail }}</li>
+      </ul>
+    </div>
+
+    <div v-if="groupCards.length" class="mt-6">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold uppercase tracking-normal text-oscuro-200">
+          Salones y ciclos ({{ groupCards.length }})
+        </h2>
+        <div class="flex gap-2 text-xs">
+          <button
+            type="button"
+            class="rounded-lg bg-oscuro-850 px-3 py-1.5 font-semibold text-oscuro-100 hover:bg-oscuro-800"
+            @click="expandAll"
+          >
+            Expandir todo
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-oscuro-850 px-3 py-1.5 font-semibold text-oscuro-100 hover:bg-oscuro-800"
+            @click="collapseAll"
+          >
+            Contraer todo
+          </button>
+        </div>
+      </div>
+      <div class="mt-3 space-y-3">
+        <GroupAccordion
+          v-for="group in groupCards"
+          :key="group.id"
+          :group="group"
+          :teams-by-id="teamsById"
+          :players-of="countedPlayers"
+          :rules-of="rulesCheck"
+          :open="isGroupOpen(group.id)"
+          @toggle="toggleGroup(group.id)"
+          @review-team="openReview"
+          @review-payment="openPayment(group.id, $event)"
+        />
+      </div>
+    </div>
+
+    <h2
+      v-if="groupCards.length && individualTeams.length"
+      class="mt-8 text-sm font-semibold uppercase tracking-normal text-oscuro-200"
+    >
+      Equipos fuera de un salón o ciclo
+    </h2>
+
+    <div v-if="individualTeams.length" class="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
       <article
-        v-for="team in filtered"
+        v-for="team in individualTeams"
         :key="team.id"
         class="flex flex-col rounded-3xl border border-oscuro-700 bg-oscuro-850 p-5 transition-all hover:border-green-700/40 hover:shadow-2xl hover:shadow-green-900/10"
       >
@@ -130,11 +193,11 @@
         <div class="mt-4 space-y-1.5 text-xs text-oscuro-300">
           <p class="flex items-center gap-2">
             <CalendarRange class="h-3.5 w-3.5 text-oscuro-500" />
-            <span class="truncate">{{ team.discipline?.event?.name || 'â€”' }}</span>
+            <span class="truncate">{{ team.discipline?.event?.name || '—' }}</span>
           </p>
           <p class="flex items-center gap-2">
             <Building2 class="h-3.5 w-3.5 text-oscuro-500" />
-            <span class="truncate">{{ team.discipline?.event?.faculty?.name || 'â€”' }}</span>
+            <span class="truncate">{{ team.discipline?.event?.faculty?.name || '—' }}</span>
           </p>
           <p class="flex items-center gap-2">
             <GraduationCap class="h-3.5 w-3.5 text-oscuro-500" />
@@ -233,258 +296,49 @@
       </article>
     </div>
 
-    <AppModal v-model="reviewOpen" :title="reviewTeam?.name || 'Revisar equipo'" size="4xl">
-      <div v-if="reviewTeam" class="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
-        <div class="space-y-4">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-normal text-green-300">
-                {{ reviewTeam.discipline?.event?.name || 'Evento' }}
-              </p>
-              <h2 class="mt-1 text-2xl font-bold text-white">{{ reviewTeam.name }}</h2>
-              <p class="mt-1 text-sm text-oscuro-400">
-                {{ reviewTeam.discipline?.name || reviewTeam.disciplineName || 'Disciplina' }}
-              </p>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <StatusBadge :status="reviewTeam.status" />
-              <button
-                v-if="auth.isAdmin && reviewTeam.status !== 'CANCELLED'"
-                type="button"
-                class="rounded-lg bg-oscuro-700/60 px-3 py-1.5 text-xs font-semibold text-oscuro-100 hover:bg-oscuro-700"
-                @click="editOpen = true"
-              >
-                Editar equipo
-              </button>
-            </div>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-3">
-            <div class="rounded-xl bg-oscuro-900/60 p-3">
-              <p class="text-xs text-oscuro-400">Delegado</p>
-              <p class="mt-1 truncate text-sm font-semibold text-white">
-                {{ reviewTeam.delegate?.fullName || 'Responsable registrado' }}
-              </p>
-              <p class="mt-1 truncate text-xs text-oscuro-400">
-                {{ reviewTeam.delegate?.email || '—' }}
-              </p>
-            </div>
-            <div class="rounded-xl bg-oscuro-900/60 p-3">
-              <p class="text-xs text-oscuro-400">Teléfono de contacto</p>
-              <p class="mt-1 truncate text-sm font-semibold text-white">
-                {{ teamPhoneLabel(reviewTeam) }}
-              </p>
-            </div>
-            <div class="rounded-xl bg-oscuro-900/60 p-3">
-              <p class="text-xs text-oscuro-400">Ciclo - sección</p>
-              <p class="mt-1 text-sm font-semibold text-white">
-                {{ teamCycleSection(reviewTeam) }}
-              </p>
-            </div>
-          </div>
-
-          <div
-            class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold"
-            :class="reviewRules.ok ? 'bg-green-500/10 text-green-300' : 'bg-red-500/10 text-red-300'"
-          >
-            <component :is="reviewRules.ok ? CheckCircle2 : AlertTriangle" class="h-4 w-4" />
-            {{ reviewRules.ok ? 'El equipo cumple las bases' : 'El equipo necesita revisiÃ³n' }}
-          </div>
-          <ul v-if="reviewRules.messages.length" class="space-y-1 rounded-xl bg-red-500/5 p-3 text-xs text-red-300">
-            <li v-for="message in reviewRules.messages" :key="message" class="flex items-center gap-1.5">
-              <AlertTriangle class="h-3 w-3 shrink-0" />
-              {{ message }}
-            </li>
-          </ul>
-
-          <div class="rounded-xl border border-oscuro-700">
-            <button
-              type="button"
-              class="flex w-full items-center justify-between border-b border-oscuro-700 px-4 py-3 text-left"
-              @click="reviewPlayersOpen = !reviewPlayersOpen"
-            >
-              <p class="font-semibold text-white">Jugadores</p>
-              <span class="flex items-center gap-2 text-xs text-oscuro-400">
-                {{ reviewTeam.participants.length }}
-                <ChevronRight
-                  class="h-4 w-4 transition-transform"
-                  :class="reviewPlayersOpen ? 'rotate-90' : ''"
-                />
-              </span>
-            </button>
-            <ul v-if="reviewPlayersOpen" class="p-2 text-sm">
-              <li
-                v-for="(participant, index) in reviewTeam.participants"
-                :key="participant.studentCode || participant.dni || participant.fullName"
-                class="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-white/5"
-              >
-                <span class="min-w-0 truncate text-oscuro-100">
-                  {{ index + 1 }}. {{ participant.fullName }}
-                </span>
-                <span class="shrink-0 font-mono text-xs text-oscuro-400">
-                  {{ participant.studentCode || participant.dni || 'â€”' }}
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div
-            v-if="needsVoucher(reviewTeam)"
-            class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="font-bold text-amber-300">Comprobante de pago</h3>
-              <StatusBadge v-if="reviewTeam.voucher" :status="reviewTeam.voucher.status" />
-            </div>
-
-            <template v-if="reviewTeam.voucher">
-              <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                <div class="rounded-xl bg-oscuro-900/60 p-3">
-                  <p class="text-xs text-oscuro-400">Monto</p>
-                  <p class="font-semibold text-green-400">
-                    {{ formatCurrency(reviewTeam.voucher.amount) }}
-                  </p>
-                </div>
-                <div class="rounded-xl bg-oscuro-900/60 p-3">
-                  <p class="text-xs text-oscuro-400">NÂ° operaciÃ³n</p>
-                  <p class="truncate font-semibold text-white">
-                    {{ reviewTeam.voucher.operationNumber || 'â€”' }}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                v-if="reviewTeam.voucher.imageUrl"
-                class="mt-4 block overflow-hidden rounded-2xl border border-oscuro-700 bg-black"
-              >
-                <img
-                  :src="resolveUrl(reviewTeam.voucher.imageUrl)"
-                  alt="voucher"
-                  class="max-h-80 w-full object-contain"
-                />
-              </div>
-              <div v-if="reviewTeam.voucher.imageUrl" class="mt-2">
-                <VoucherLink :voucher="reviewTeam.voucher" label="Ampliar comprobante" />
-              </div>
-
-              <p
-                v-if="reviewTeam.voucher.status === 'REJECTED' && reviewTeam.voucher.rejectionReason"
-                class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300"
-              >
-                Voucher rechazado: {{ reviewTeam.voucher.rejectionReason }}
-              </p>
-            </template>
-
-            <p v-else class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
-              Este equipo de pago no tiene voucher adjunto.
-            </p>
-          </div>
-
-          <div v-else class="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
-            <h3 class="font-bold text-green-300">Inscripción gratuita</h3>
-            <p class="mt-1 text-sm text-oscuro-300">
-              Solo requiere validar que el equipo cumpla las bases.
-            </p>
-          </div>
-
-          <p
-            v-if="reviewTeam.status === 'REJECTED' && reviewTeam.rejectionReason"
-            class="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300"
-          >
-            InscripciÃ³n rechazada: {{ reviewTeam.rejectionReason }}
-          </p>
-        </div>
-      </div>
-
-      <template v-if="reviewTeam && reviewTeam.status === 'PENDING' && auth.isAdmin" #footer>
-        <div class="grid gap-3">
-          <div
-            v-if="needsVoucher(reviewTeam) && reviewTeam.voucher?.status === 'PENDING'"
-            class="grid gap-2 sm:grid-cols-[1fr_auto_auto]"
-          >
-            <input
-              v-model="registrationRejectReason"
-              placeholder="Motivo de rechazo de inscripción"
-              class="min-w-0 rounded-lg border border-oscuro-700 bg-oscuro-900/60 px-3 py-2 text-sm text-white"
-            />
-            <button
-              class="rounded-lg bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/25"
-              @click="rejectReview"
-            >
-              Rechazar inscripción
-            </button>
-            <button
-              class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-50"
-              :disabled="!reviewRules.ok"
-              @click="validateVoucher"
-            >
-              {{ reviewTeam.groupId ? 'Validar pago del salón y aprobar equipos' : 'Validar voucher y aprobar' }}
-            </button>
-          </div>
-
-          <button
-            v-else-if="!needsVoucher(reviewTeam) || reviewTeam.voucher?.status === 'VALIDATED'"
-            class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-50"
-            :disabled="!reviewRules.ok"
-            @click="approveReview"
-          >
-            Aprobar inscripción
-          </button>
-
-          <div
-            v-if="!(needsVoucher(reviewTeam) && reviewTeam.voucher?.status === 'PENDING')"
-            class="grid gap-2 sm:grid-cols-[1fr_auto]"
-          >
-            <input
-              v-model="registrationRejectReason"
-              placeholder="Motivo de rechazo de inscripción"
-              class="min-w-0 rounded-lg border border-oscuro-700 bg-oscuro-900/60 px-3 py-2 text-sm text-white"
-            />
-            <button
-              class="rounded-lg bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/25"
-              @click="rejectReview"
-            >
-              Rechazar inscripción
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <!-- Tesorero: solo valida o rechaza el comprobante; aprobar o rechazar equipos es del administrador -->
-      <template
-        v-else-if="
-          reviewTeam &&
-          reviewTeam.status === 'PENDING' &&
-          auth.isTreasurer &&
-          needsVoucher(reviewTeam) &&
-          reviewTeam.voucher?.status === 'PENDING'
-        "
-        #footer
-      >
-        <div class="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-          <input
-            v-model="registrationRejectReason"
-            placeholder="Motivo de rechazo del comprobante"
-            class="min-w-0 rounded-lg border border-oscuro-700 bg-oscuro-900/60 px-3 py-2 text-sm text-white"
-          />
-          <button
-            class="rounded-lg bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/25 disabled:opacity-50"
-            :disabled="!registrationRejectReason.trim()"
-            @click="rejectVoucher"
-          >
-            Rechazar comprobante
-          </button>
-          <button
-            class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-50"
-            :disabled="!reviewRules.ok"
-            @click="validateVoucher"
-          >
-            {{ reviewTeam.groupId ? 'Validar pago del salón y aprobar equipos' : 'Validar voucher y aprobar' }}
-          </button>
-        </div>
-      </template>
+    <!-- Un solo modal con dos paneles (equipo / pago de un salón): se cambia de panel, nunca se apilan modales -->
+    <AppModal
+      v-model="reviewOpen"
+      :title="reviewTitle"
+      :size="reviewSize"
+      :back-label="reviewBackLabel"
+      @back="backReview"
+    >
+      <p v-if="reviewError" class="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        {{ reviewError }}
+      </p>
+      <TeamReviewPane
+        v-if="review?.view === 'team' && reviewTeam"
+        :key="`team-${reviewTeam.id}`"
+        :team="reviewTeam"
+        :group="reviewTeamGroup"
+        :coverage="reviewTeamCoverage"
+        :rules="rulesCheck(reviewTeam)"
+        :players="countedPlayers(reviewTeam)"
+        :paid="needsVoucher(reviewTeam)"
+        :is-admin="auth.isAdmin"
+        :is-treasurer="auth.isTreasurer"
+        :busy="busy"
+        @saved="onTeamEdited"
+        @approve="approveReview"
+        @reject="rejectReview"
+        @validate-voucher="validateTeamVoucher"
+        @reject-voucher="rejectTeamVoucher"
+        @view-payment="goToPayment"
+      />
+      <PaymentReviewPane
+        v-else-if="review?.view === 'payment' && paymentContext"
+        :key="`pago-${paymentContext.voucher.id}`"
+        :group="paymentContext.group"
+        :voucher="paymentContext.voucher"
+        :rows="paymentContext.rows"
+        :players-of="countedPlayers"
+        :rules-of="rulesCheck"
+        :busy="busy"
+        @validate="validateGroupPayment"
+        @reject="rejectGroupPayment"
+        @view-team="viewTeamFromPayment"
+      />
     </AppModal>
 
     <AppModal v-model="createOpen" title="Crear equipo manualmente">
@@ -494,10 +348,10 @@
           <select v-model.number="createForm.disciplineId" required class="input">
             <option :value="0" disabled>Selecciona...</option>
             <option v-for="discipline in disciplines" :key="discipline.id" :value="discipline.id">
-              {{ discipline.name }} Â·
+              {{ discipline.name }} ·
               {{ discipline.participantType === 'OTHER' ? 'Otros' : 'Solo estudiantes' }}
-              Â· {{ discipline.isPaid ? formatCurrency(discipline.cost) : 'Gratuito' }}
-              <template v-if="discipline.event"> Â· {{ discipline.event.name }}</template>
+              · {{ discipline.isPaid ? formatCurrency(discipline.cost) : 'Gratuito' }}
+              <template v-if="discipline.event"> · {{ discipline.event.name }}</template>
             </option>
           </select>
           <span v-if="!disciplines.length" class="mt-1 block text-xs text-amber-400">
@@ -511,7 +365,7 @@
         </label>
 
         <label class="block">
-          <span class="text-sm text-oscuro-200">TelÃ©fono (opcional)</span>
+          <span class="text-sm text-oscuro-200">Teléfono (opcional)</span>
           <input v-model="createForm.phone" class="input" />
         </label>
 
@@ -520,11 +374,11 @@
           <select v-model.number="createForm.delegateId" required class="input">
             <option :value="0" disabled>Selecciona un usuario</option>
             <option v-for="user in delegateOptions" :key="user.id" :value="user.id">
-              {{ user.fullName }} Â· {{ user.email }}
+              {{ user.fullName }} · {{ user.email }}
             </option>
           </select>
           <span class="mt-1 block text-xs text-oscuro-400">
-            Esta persona podrÃ¡ ver y gestionar la inscripciÃ³n.
+            Esta persona podrá ver y gestionar la inscripción.
           </span>
         </label>
 
@@ -534,7 +388,7 @@
             <input v-model="createForm.cycle" class="input" placeholder="Ej. VIII" />
           </label>
           <label class="block">
-            <span class="text-sm text-oscuro-200">SecciÃ³n</span>
+            <span class="text-sm text-oscuro-200">Sección</span>
             <input v-model="createForm.section" class="input" placeholder="Ej. A" />
           </label>
         </div>
@@ -544,8 +398,8 @@
           <p class="mt-1 text-xs text-oscuro-400">
             {{
               participantMode === 'OTHER'
-                ? 'Busca por DNI (8 dÃ­gitos) en RENIEC.'
-                : 'Busca por cÃ³digo de estudiante en el padrÃ³n.'
+                ? 'Busca por DNI (8 dígitos) en RENIEC.'
+                : 'Busca por código de estudiante en el padrón.'
             }}
             El delegado responsable se elige aparte y no cuenta como jugador.
           </p>
@@ -556,7 +410,7 @@
           <div class="mt-2 flex gap-2">
             <input
               v-model="participantSearch"
-              :placeholder="participantMode === 'OTHER' ? 'DNI (8 dÃ­gitos)' : 'CÃ³digo de estudiante'"
+              :placeholder="participantMode === 'OTHER' ? 'DNI (8 dígitos)' : 'Código de estudiante'"
               :inputmode="participantMode === 'OTHER' ? 'numeric' : 'text'"
               class="input flex-1"
               @keydown.enter.prevent="searchParticipant"
@@ -580,7 +434,7 @@
               <span>
                 {{ participant.fullName }}
                 <span class="text-xs text-oscuro-400">
-                  Â· {{ participant.studentCode || participant.dni || 's/d' }}
+                  · {{ participant.studentCode || participant.dni || 's/d' }}
                 </span>
               </span>
               <button
@@ -602,7 +456,7 @@
             Comprobante de pago ({{ formatCurrency(selectedDiscipline.cost) }})
           </span>
           <label class="block">
-            <span class="text-xs text-oscuro-300">NÂ° de operaciÃ³n</span>
+            <span class="text-xs text-oscuro-300">N° de operación</span>
             <input v-model="createForm.operationNumber" class="input" />
           </label>
           <label class="block">
@@ -622,7 +476,6 @@
       </form>
     </AppModal>
 
-    <AdminTeamEditModal v-model="editOpen" :team="reviewTeam" @saved="onTeamEdited" />
   </div>
 </template>
 
@@ -640,7 +493,9 @@ import {
 import type {
   AcademicStudent,
   AuthUser,
+  ClassGroup,
   Discipline,
+  GroupVoucherValidation,
   Participant,
   ParticipantType,
   RegistrationStatus,
@@ -648,6 +503,7 @@ import type {
   Team,
 } from '~/types/domain'
 import { formatCurrency } from '~/utils/format'
+import { ATTENTION_ORDER, apiMessage, coverageOf, groupAttention, groupTeamRows } from '~/utils/groups'
 import {
   countedParticipants,
   participantTypeLabel,
@@ -658,6 +514,7 @@ import { useAuthStore } from '~/stores/auth'
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const route = useRoute()
+const router = useRouter()
 const api = useApi()
 const auth = useAuthStore()
 const config = useRuntimeConfig()
@@ -698,10 +555,6 @@ watch(
   },
 )
 
-watch(paymentFilter, () => {
-  loadTeams()
-})
-
 const filters = computed<{ label: string; value: RegistrationStatus | 'ALL' }[]>(() => [
   { label: 'Pendientes', value: 'PENDING' },
   { label: 'Aprobados', value: 'APPROVED' },
@@ -717,11 +570,56 @@ const paymentFilters: { label: string; value: 'ALL' | 'FREE' | 'PAID' }[] = [
   { label: 'De pago', value: 'PAID' },
 ]
 
-const filtered = computed(() =>
-  filter.value === 'ALL'
-    ? teams.value
-    : teams.value.filter((team) => team.status === filter.value),
+/**
+ * El filtro de pago se aplica aquí y no en el servidor: `GET /registrations?isPaid=` mira solo
+ * `discipline.isPaid`, y en un evento por salón o ciclo el pago va por el comprobante del grupo
+ * (una disciplina puede tener `isPaid = false` y sus equipos igual deben pagar). Así el Tesorero,
+ * que entra con «De pago», no deja de ver equipos con comprobante por revisar.
+ */
+const filtered = computed(() => {
+  const byStatus =
+    filter.value === 'ALL'
+      ? teams.value
+      : teams.value.filter((team) => team.status === filter.value)
+  if (paymentFilter.value === 'PAID') return byStatus.filter((team) => needsVoucher(team))
+  if (paymentFilter.value === 'FREE') return byStatus.filter((team) => !needsVoucher(team))
+  return byStatus
+})
+
+/**
+ * Los equipos de un salón o ciclo se muestran juntos en una tarjeta del grupo (su pago general único,
+ * los equipos que cubre y, aparte, cada equipo adicional con su comprobante). Así aprobar el pago no
+ * hace "desaparecer" a los demás equipos del pack: siguen a la vista con su nuevo estado.
+ */
+const groups = ref<ClassGroup[]>([])
+const teamsById = computed(() => new Map(teams.value.map((team) => [team.id, team] as const)))
+const groupedTeamIds = computed(
+  () =>
+    new Set(groups.value.flatMap((group) => group.disciplines.flatMap((d) => d.teams.map((t) => t.id)))),
 )
+
+/** Una tarjeta de grupo aparece si alguno de sus equipos (ya filtrado por la pantalla) está en la pestaña. */
+const groupCards = computed(() => {
+  if (paymentFilter.value === 'FREE') return []
+  return groups.value
+    .filter((group) =>
+      group.disciplines.some((discipline) =>
+        discipline.teams.some(
+          (team) =>
+            teamsById.value.has(team.id) && (filter.value === 'ALL' || team.status === filter.value),
+        ),
+      ),
+    )
+    .sort(
+      (a, b) =>
+        ATTENTION_ORDER[groupAttention(a)] - ATTENTION_ORDER[groupAttention(b)] ||
+        a.label.localeCompare(b.label, 'es'),
+    )
+})
+
+/** Equipos sueltos: los que no pertenecen a un salón o ciclo (o cuyo grupo no se pudo cargar). */
+const individualTeams = computed(() => filtered.value.filter((team) => !groupedTeamIds.value.has(team.id)))
+const visibleCount = computed(() => groupCards.value.length + individualTeams.value.length)
 
 function resolveUrl(path: string) {
   if (path.startsWith('http')) return path
@@ -734,17 +632,17 @@ function rulesCheck(team: Team): { ok: boolean; messages: string[] } {
   const count = countedPlayers(team)
   if (discipline) {
     if (count < discipline.minPlayers)
-      messages.push(`MÃ­nimo ${discipline.minPlayers} jugadores (tiene ${count}).`)
+      messages.push(`Mínimo ${discipline.minPlayers} jugadores (tiene ${count}).`)
     if (count > discipline.maxPlayers)
-      messages.push(`MÃ¡ximo ${discipline.maxPlayers} jugadores (tiene ${count}).`)
+      messages.push(`Máximo ${discipline.maxPlayers} jugadores (tiene ${count}).`)
     if (discipline.genderPolicy === 'MALE' && team.participants.some((p) => p.gender === 'F'))
       messages.push('La disciplina es solo varones.')
     if (discipline.genderPolicy === 'FEMALE' && team.participants.some((p) => p.gender === 'M'))
       messages.push('La disciplina es solo mujeres.')
     if (discipline.participantType === 'STUDENT' && team.participants.some((p) => !p.studentCode))
-      messages.push('Todos los jugadores deben tener cÃ³digo de estudiante.')
+      messages.push('Todos los jugadores deben tener código de estudiante.')
     if (discipline.participantType === 'STUDENT' && (!team.cycle || !team.section))
-      messages.push('El equipo debe tener ciclo y secciÃ³n.')
+      messages.push('El equipo debe tener ciclo y sección.')
     if (discipline.participantType === 'OTHER' && team.participants.some((p) => !p.dni))
       messages.push('Todos los jugadores deben tener DNI.')
   }
@@ -757,7 +655,7 @@ function countedPlayers(team: Team) {
 
 function teamCycleSection(team: Team) {
   if (!team.cycle && !team.section) return '-'
-  return `${team.cycle || 's/ciclo'} - ${team.section || 's/secciÃ³n'}`
+  return `${team.cycle || 's/ciclo'} - ${team.section || 's/sección'}`
 }
 
 function teamPhoneLabel(team: Team) {
@@ -769,17 +667,22 @@ function needsVoucher(team: Team) {
   return !!team.discipline?.isPaid || (team.groupId !== null && team.groupId !== undefined)
 }
 
-function voucherBadge(team: Team) {
+function voucherState(team: Team) {
   if (!team.voucher) return 'Sin voucher'
   if (team.voucher.status === 'VALIDATED') return 'Voucher validado'
   if (team.voucher.status === 'REJECTED') return 'Voucher rechazado'
   return 'Voucher pendiente'
 }
 
+/** En un salón o ciclo el primer equipo de cada disciplina va incluido en el pack; los demás son adicionales. */
+function voucherBadge(team: Team) {
+  const state = voucherState(team)
+  if (team.groupId === null || team.groupId === undefined || !team.slot) return state
+  return `${team.slot === 1 ? 'Incluido en el pack' : 'Adicional'} · ${state.toLowerCase()}`
+}
+
 async function loadTeams() {
   const query: Record<string, number | boolean | ParticipantType> = {}
-  if (paymentFilter.value === 'FREE') query.isPaid = false
-  if (paymentFilter.value === 'PAID') query.isPaid = true
   if (adv.eventId) query.eventId = adv.eventId
   if (adv.facultyId) query.facultyId = adv.facultyId
   if (adv.schoolId) query.schoolId = adv.schoolId
@@ -790,6 +693,18 @@ async function loadTeams() {
   } catch {
     teams.value = []
   }
+  await loadGroups()
+}
+
+/** `GET /groups` exige el evento: se piden los de cada evento con cobro por salón o ciclo. */
+async function loadGroups() {
+  const eventIds = events.value
+    .filter((event) => event.pricingMode === 'PER_GROUP' && (!adv.eventId || event.id === adv.eventId))
+    .map((event) => event.id)
+  const lists = await Promise.all(
+    eventIds.map((eventId) => api.get<ClassGroup[]>('/groups', { eventId }).catch(() => [] as ClassGroup[])),
+  )
+  groups.value = lists.flat()
 }
 
 async function loadDisciplines() {
@@ -823,61 +738,265 @@ async function load() {
   }
 }
 
-const reviewOpen = ref(false)
-const editOpen = ref(false)
-const reviewTeam = ref<Team | null>(null)
-const reviewPlayersOpen = ref(false)
-const registrationRejectReason = ref('')
+/**
+ * Un solo modal con dos paneles: el del equipo y el del pago de un salón o ciclo. Se cambia de panel
+ * («Ver pago →» / «Ver equipo →»), nunca se apila otro modal. Los datos salen de las listas de la pantalla
+ * (computed sobre `teams` y `groups`), así que tras editar, aprobar o validar la revisión muestra el estado
+ * nuevo sin volver a abrirla.
+ */
+type Review =
+  | { view: 'team'; teamId: number }
+  | { view: 'payment'; groupId: number; voucherId: number }
 
-const reviewRules = computed(() =>
-  reviewTeam.value ? rulesCheck(reviewTeam.value) : { ok: true, messages: [] },
+/** Paneles abiertos (el último es el visible); cada uno es una entrada del historial del navegador. */
+const reviewStack = ref<Review[]>([])
+const review = computed<Review | null>(() => reviewStack.value[reviewStack.value.length - 1] ?? null)
+const reviewOpen = computed({
+  get: () => reviewStack.value.length > 0,
+  set: (open: boolean) => {
+    if (!open) closeReview()
+  },
+})
+/** Texto del botón ← del modal: a qué panel vuelve (vacío si no hay panel anterior). */
+const reviewBackLabel = computed(() => {
+  const previous = reviewStack.value[reviewStack.value.length - 2]
+  if (!previous) return ''
+  return previous.view === 'payment' ? 'Volver al pago' : 'Volver al equipo'
+})
+const busy = ref(false)
+const reviewError = ref('')
+const notice = ref<{ kind: 'ok' | 'error'; text: string; details: string[] } | null>(null)
+
+const reviewTeam = computed(() =>
+  review.value?.view === 'team' ? (teamsById.value.get(review.value.teamId) ?? null) : null,
+)
+
+/** Salón o ciclo al que pertenece un equipo (si paga por grupo) y el comprobante que lo cubre. */
+const reviewTeamGroup = computed(() => {
+  const team = reviewTeam.value
+  if (!team) return null
+  return (
+    groups.value.find((group) =>
+      group.disciplines.some((discipline) => discipline.teams.some((t) => t.id === team.id)),
+    ) ?? null
+  )
+})
+const reviewTeamCoverage = computed(() =>
+  reviewTeam.value && reviewTeamGroup.value ? coverageOf(reviewTeamGroup.value, reviewTeam.value.id) : null,
+)
+
+/** Comprobante del salón que se está revisando, con los equipos que cubre. */
+const paymentContext = computed(() => {
+  const current = review.value
+  if (current?.view !== 'payment') return null
+  const group = groups.value.find((item) => item.id === current.groupId)
+  if (!group) return null
+  const base = group.baseVoucher?.id === current.voucherId ? group.baseVoucher : null
+  const extra = group.extraVouchers.find((item) => item.id === current.voucherId)
+  const voucher = base ?? extra
+  if (!voucher) return null
+  const rows = groupTeamRows(group, teamsById.value).filter((row) =>
+    base ? row.voucherId === base.id : !!extra && extra.teamIds.includes(row.id),
+  )
+  return { group, voucher, rows }
+})
+
+const reviewSize = computed<'2xl' | '4xl'>(() => {
+  if (review.value?.view === 'payment') return '4xl'
+  const team = reviewTeam.value
+  // Un equipo que paga por disciplina trae su comprobante al lado; uno de un salón es solo el equipo.
+  return team && !reviewTeamGroup.value && needsVoucher(team) ? '4xl' : '2xl'
+})
+
+const reviewTitle = computed(() => {
+  if (review.value?.view === 'payment') {
+    const context = paymentContext.value
+    if (context?.voucher.kind === 'EXTRA') return 'Pago del equipo adicional'
+    return `Pago general · ${context?.group.scope === 'CYCLE' ? 'Pack del ciclo' : 'Pack del salón'}`
+  }
+  const team = reviewTeam.value
+  return team ? `${team.discipline?.name || team.disciplineName || 'Equipo'} · ${team.name}` : 'Revisar equipo'
+})
+
+// Si lo que se revisa deja de estar en las listas (p. ej. se recargaron con otros filtros), se cierra el modal.
+watch([reviewTeam, paymentContext], () => {
+  if (review.value && !reviewTeam.value && !paymentContext.value) closeReview()
+})
+watch(review, () => {
+  reviewError.value = ''
+})
+
+/**
+ * El modal vive en el historial del navegador (parámetro `revision` = cuántos paneles hay abiertos): «Atrás»,
+ * el gesto de retroceso o el botón ← del modal vuelven al panel anterior y, desde el primero, cierran el modal;
+ * nunca sacan al usuario de la pantalla. Cerrar con la X, el fondo o tras una acción retira todas las entradas.
+ */
+function pushReview(next: Review) {
+  reviewStack.value = [...reviewStack.value, next]
+  void router.push({ query: { ...route.query, revision: String(reviewStack.value.length) } })
+}
+
+function closeReview() {
+  const depth = reviewStack.value.length
+  if (!depth) return
+  reviewStack.value = []
+  router.go(-depth)
+}
+
+/** Un solo paso atrás: el cambio del parámetro `revision` descarta el panel visible (ver el watch de abajo). */
+function backReview() {
+  router.back()
+}
+
+watch(
+  () => route.query.revision,
+  (value) => {
+    const depth = Number(value ?? 0)
+    const wanted = Number.isInteger(depth) && depth > 0 ? depth : 0
+    if (wanted < reviewStack.value.length) {
+      reviewStack.value = reviewStack.value.slice(0, wanted)
+    } else if (wanted > reviewStack.value.length && import.meta.client) {
+      // Enlace recargado o «Adelante» sin panel que mostrar: se limpia el parámetro y no se abre nada.
+      reviewStack.value = []
+      const rest = Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'revision'))
+      void router.replace({ query: rest })
+    }
+  },
+  { immediate: true },
 )
 
 function openReview(team: Team) {
-  reviewTeam.value = team
-  registrationRejectReason.value = ''
-  reviewPlayersOpen.value = false
-  reviewOpen.value = true
+  reviewStack.value = []
+  pushReview({ view: 'team', teamId: team.id })
 }
 
-/** Tras editar el equipo se recarga la lista y la revisión muestra los datos nuevos. */
+function openPayment(groupId: number, voucherId: number) {
+  reviewStack.value = []
+  pushReview({ view: 'payment', groupId, voucherId })
+}
+
+/** «Ver pago →» desde un equipo de un salón. */
+function goToPayment() {
+  const group = reviewTeamGroup.value
+  const coverage = reviewTeamCoverage.value
+  if (group && coverage) pushReview({ view: 'payment', groupId: group.id, voucherId: coverage.voucher.id })
+}
+
+/** «Ver equipo →» desde el pago. */
+function viewTeamFromPayment(team: Team) {
+  pushReview({ view: 'team', teamId: team.id })
+}
+
+/** Ejecuta una acción de la revisión: bloquea los botones y deja el error dentro del modal. */
+async function run(action: () => Promise<void>, failure: string) {
+  busy.value = true
+  reviewError.value = ''
+  try {
+    await action()
+  } catch (err) {
+    reviewError.value = apiMessage(err, failure)
+  } finally {
+    busy.value = false
+  }
+}
+
+/** Tras editar el equipo se recarga la lista y el panel muestra los datos nuevos (sigue abierto). */
 async function onTeamEdited() {
-  const id = reviewTeam.value?.id
-  await loadTeams()
-  if (id) reviewTeam.value = teams.value.find((team) => team.id === id) ?? reviewTeam.value
-}
-
-async function approveReview() {
-  if (!reviewTeam.value) return
-  await api.patch(`/registrations/${reviewTeam.value.id}/approve`, {})
-  reviewOpen.value = false
   await loadTeams()
 }
 
-async function rejectReview() {
-  if (!reviewTeam.value) return
-  const reason = registrationRejectReason.value.trim()
-  if (!reason) return
-  await api.patch(`/registrations/${reviewTeam.value.id}/reject`, { reason })
+function finishAction(ok: string, details: string[] = []) {
+  notice.value = { kind: 'ok', text: ok, details }
   reviewOpen.value = false
-  await loadTeams()
 }
 
-async function validateVoucher() {
-  if (!reviewTeam.value?.voucher) return
-  await api.patch(`/vouchers/${reviewTeam.value.voucher.id}/validate`, {})
-  reviewOpen.value = false
-  await loadTeams()
+function approveReview() {
+  const team = reviewTeam.value
+  if (!team) return
+  return run(async () => {
+    await api.patch(`/registrations/${team.id}/approve`, {})
+    finishAction(`Equipo «${team.name}» aprobado.`)
+    await loadTeams()
+  }, `No se pudo aprobar el equipo «${team.name}».`)
+}
+
+function rejectReview(reason: string) {
+  const team = reviewTeam.value
+  if (!team || !reason) return
+  return run(async () => {
+    await api.patch(`/registrations/${team.id}/reject`, { reason })
+    finishAction(`Equipo «${team.name}» rechazado.`)
+    await loadTeams()
+  }, `No se pudo rechazar el equipo «${team.name}».`)
+}
+
+/** Voucher propio de un equipo que paga por disciplina. */
+function validateTeamVoucher() {
+  const team = reviewTeam.value
+  if (!team?.voucher) return
+  const voucherId = team.voucher.id
+  return run(async () => {
+    await api.patch(`/vouchers/${voucherId}/validate`, {})
+    finishAction(`Voucher validado: equipo «${team.name}» aprobado.`)
+    await loadTeams()
+  }, 'No se pudo validar el voucher.')
 }
 
 /** Rechaza solo el comprobante (el delegado puede reemplazarlo); el equipo sigue pendiente. */
-async function rejectVoucher() {
-  if (!reviewTeam.value?.voucher) return
-  const reason = registrationRejectReason.value.trim()
-  if (!reason) return
-  await api.patch(`/vouchers/${reviewTeam.value.voucher.id}/reject`, { reason })
-  reviewOpen.value = false
-  await loadTeams()
+function rejectTeamVoucher(reason: string) {
+  const team = reviewTeam.value
+  if (!team?.voucher || !reason) return
+  const voucherId = team.voucher.id
+  return run(async () => {
+    await api.patch(`/vouchers/${voucherId}/reject`, { reason })
+    finishAction(`Comprobante del equipo «${team.name}» rechazado.`)
+    await loadTeams()
+  }, 'No se pudo rechazar el comprobante.')
+}
+
+/** Pago general o adicional de un salón: se valida una sola vez y aprueba los equipos que cumplen las bases. */
+function validateGroupPayment() {
+  const context = paymentContext.value
+  if (!context) return
+  return run(async () => {
+    const result = await api.patch<GroupVoucherValidation>(`/vouchers/${context.voucher.id}/validate`, {})
+    const names = new Map(
+      context.group.disciplines.flatMap((d) => d.teams.map((t) => [t.id, t.name] as const)),
+    )
+    finishAction(
+      `Pago validado. Equipos aprobados: ${result.approvedTeamIds.length}.`,
+      result.skipped.map((item) => `${names.get(item.teamId) ?? `Equipo #${item.teamId}`}: ${item.reason}`),
+    )
+    await loadTeams()
+  }, 'No se pudo validar el pago.')
+}
+
+function rejectGroupPayment(reason: string) {
+  const context = paymentContext.value
+  if (!context || !reason) return
+  return run(async () => {
+    await api.patch(`/vouchers/${context.voucher.id}/reject`, { reason })
+    finishAction('Comprobante rechazado: el delegado podrá reenviarlo y los equipos aprobados con él vuelven a pendientes.')
+    await loadTeams()
+  }, 'No se pudo rechazar el comprobante.')
+}
+
+/** Desplegables de salones: todos contraídos al abrir la pantalla; se abre el que se va a revisar. */
+const openGroupIds = ref<number[]>([])
+const isGroupOpen = (id: number) => openGroupIds.value.includes(id)
+
+function toggleGroup(id: number) {
+  openGroupIds.value = isGroupOpen(id)
+    ? openGroupIds.value.filter((openId) => openId !== id)
+    : [...openGroupIds.value, id]
+}
+
+function expandAll() {
+  openGroupIds.value = groupCards.value.map((group) => group.id)
+}
+
+function collapseAll() {
+  openGroupIds.value = []
 }
 
 const createOpen = ref(false)
@@ -969,7 +1088,7 @@ async function searchParticipant() {
     let person: AcademicStudent
     if (participantMode.value === 'OTHER') {
       if (!/^\d{8}$/.test(q)) {
-        participantError.value = 'Ingresa un DNI vÃ¡lido de 8 dÃ­gitos.'
+        participantError.value = 'Ingresa un DNI válido de 8 dígitos.'
         return
       }
       person = await api.get<AcademicStudent>('/academic/dni', { numero: q })
@@ -1002,8 +1121,8 @@ async function searchParticipant() {
   } catch {
     participantError.value =
       participantMode.value === 'OTHER'
-        ? 'No se encontrÃ³ una persona con ese DNI.'
-        : 'No se encontrÃ³ un estudiante Ãºnico con ese cÃ³digo.'
+        ? 'No se encontró una persona con ese DNI.'
+        : 'No se encontró un estudiante único con ese código.'
   } finally {
     searching.value = false
   }
@@ -1027,7 +1146,7 @@ async function submitCreate() {
     participantMode.value === 'STUDENT' &&
     (!createForm.cycle.trim() || !createForm.section.trim())
   ) {
-    modalError.value = 'Completa ciclo y secciÃ³n del equipo.'
+    modalError.value = 'Completa ciclo y sección del equipo.'
     return
   }
   if (
