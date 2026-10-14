@@ -21,6 +21,16 @@ const sanitizeConfig = {
   ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
 }
 
+/**
+ * Tamaño máximo de un texto con formato, en bytes UTF-8. El backend lo guarda en una columna TEXT (65 535
+ * bytes) y rechaza lo que no cabe (mismo valor que `RICH_TEXT_MAX_BYTES` del backend, con margen).
+ */
+export const RICH_TEXT_MAX_BYTES = 60_000
+
+export function richTextBytes(value?: string | null) {
+  return value ? new TextEncoder().encode(value).length : 0
+}
+
 export function isRichTextEmpty(value?: string | null) {
   if (!value) return true
   return !value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()

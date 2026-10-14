@@ -137,11 +137,13 @@
             max-height="460px"
           />
         </div>
+        <p v-if="modalError" class="text-sm text-red-400 sm:col-span-2">{{ modalError }}</p>
         <button
           type="submit"
-          class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400 sm:col-span-2"
+          class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-60 sm:col-span-2"
+          :disabled="saving"
         >
-          Guardar disciplina
+          {{ saving ? 'Guardando…' : 'Guardar disciplina' }}
         </button>
       </form>
     </AppModal>
@@ -395,9 +397,10 @@
         <p v-if="modalError" class="text-sm text-red-400 sm:col-span-2">{{ modalError }}</p>
         <button
           type="submit"
-          class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400 sm:col-span-2"
+          class="rounded-lg bg-green-500 px-5 py-2.5 font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-60 sm:col-span-2"
+          :disabled="saving"
         >
-          Guardar cambios
+          {{ saving ? 'Guardando…' : 'Guardar cambios' }}
         </button>
       </form>
     </AppModal>
@@ -424,6 +427,7 @@ import {
   isDeadlinePassed,
   toDateTimeLocalInput,
 } from '~/utils/format'
+import { RICH_TEXT_MAX_BYTES, richTextBytes } from '~/utils/richText'
 import { SPORTS, getSportMeta } from '~/utils/sports'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -509,13 +513,27 @@ async function loadDisciplines() {
   }
 }
 
+const saving = ref(false)
+
+/** Mensaje si las bases no caben en la columna del servidor; `null` si el tamaño es válido. */
+function rulesTooLong(rulesText: string): string | null {
+  const bytes = richTextBytes(rulesText)
+  if (bytes <= RICH_TEXT_MAX_BYTES) return null
+  return `Las bases ocupan ${(bytes / 1000).toFixed(1)} KB y el máximo es ${(RICH_TEXT_MAX_BYTES / 1000).toFixed(1)} KB. Acórtalas e inténtalo de nuevo.`
+}
+
 async function create() {
+  modalError.value = rulesTooLong(form.rulesText) ?? ''
+  if (modalError.value) return
+  saving.value = true
   try {
     await api.post('/disciplines', disciplinePayload(form))
     showForm.value = false
     await load()
-  } catch {
-    /* noop */
+  } catch (err) {
+    showModalError(err, 'No se pudo guardar la disciplina')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -545,15 +563,25 @@ function resetForm() {
 
 function openCreate() {
   resetForm()
+  modalError.value = ''
   showForm.value = true
 }
 
 const modalError = ref('')
 
+/** Muestra el mensaje del servidor; ante un 500 (o sin mensaje) explica que el problema no es del usuario. */
 function showModalError(err: unknown, fallback: string) {
+  const e = err as {
+    statusCode?: number
+    status?: number
+    data?: { statusCode?: number; message?: string | string[] }
+  }
+  const status = e?.statusCode ?? e?.status ?? e?.data?.statusCode ?? 0
+  const message = e?.data?.message?.toString()
   modalError.value =
-    (err as { data?: { message?: string | string[] } })?.data?.message?.toString() ??
-    fallback
+    status >= 500 || !message
+      ? `${fallback}. El servidor tuvo un problema: inténtalo de nuevo y, si se repite, avisa al administrador del sistema.`
+      : message
 }
 
 function disciplinePayload<T extends { registrationDeadline: string }>(source: T) {
@@ -626,13 +654,17 @@ function openEdit(d: Discipline) {
 }
 
 async function saveEdit() {
-  modalError.value = ''
+  modalError.value = rulesTooLong(editForm.rulesText) ?? ''
+  if (modalError.value) return
+  saving.value = true
   try {
     await api.patch(`/disciplines/${editId.value}`, disciplinePayload(editForm))
     editOpen.value = false
     await load()
   } catch (err) {
     showModalError(err, 'No se pudo actualizar la disciplina')
+  } finally {
+    saving.value = false
   }
 }
 

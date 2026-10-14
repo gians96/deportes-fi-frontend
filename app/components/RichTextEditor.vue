@@ -30,14 +30,20 @@
         @dblclick.stop
       />
     </div>
+
+    <p
+      v-if="bytes > maxBytes * 0.5"
+      class="border-t border-oscuro-700 px-3 py-1.5 text-xs"
+      :class="bytes > maxBytes ? 'font-semibold text-red-300' : 'text-oscuro-300'"
+    >
+      {{ toKb(bytes) }} KB de {{ toKb(maxBytes) }} KB<template v-if="bytes > maxBytes">. Es demasiado largo: acórtalo para poder guardar.</template>
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Link from '@tiptap/extension-link'
 import {
   Bold,
   Heading2,
@@ -52,20 +58,26 @@ import {
   Underline as UnderlineIcon,
   Undo2,
 } from 'lucide-vue-next'
-import { normalizeEditorHtml } from '~/utils/richText'
+import { RICH_TEXT_MAX_BYTES, normalizeEditorHtml, richTextBytes } from '~/utils/richText'
 
 const props = withDefaults(
   defineProps<{
     modelValue?: string | null
     minHeight?: string
     maxHeight?: string
+    /** Tamaño máximo del texto en bytes; el contador aparece al pasar de la mitad. */
+    maxBytes?: number
   }>(),
   {
     modelValue: '',
     minHeight: '220px',
     maxHeight: '420px',
+    maxBytes: RICH_TEXT_MAX_BYTES,
   },
 )
+
+const bytes = computed(() => richTextBytes(props.modelValue))
+const toKb = (value: number) => (value / 1000).toFixed(1)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -73,18 +85,19 @@ const emit = defineEmits<{
 
 const editor = useEditor({
   content: props.modelValue || '',
+  // TipTap 3: el StarterKit ya incluye Underline y Link. Declararlos aparte los duplica y TipTap avisa
+  // «Duplicate extension names found»; por eso solo se configuran aquí.
   extensions: [
     StarterKit.configure({
       heading: { levels: [2, 3] },
-    }),
-    Underline,
-    Link.configure({
-      openOnClick: false,
-      autolink: true,
-      defaultProtocol: 'https',
-      HTMLAttributes: {
-        target: '_blank',
-        rel: 'noopener noreferrer',
+      link: {
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+        },
       },
     }),
   ],
