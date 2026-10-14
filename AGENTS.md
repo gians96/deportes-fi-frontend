@@ -92,7 +92,7 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
   del grupo (`paysByGroup` en `utils/groups.ts`), no por `discipline.isPaid`.
 - Borradores, comprobante y API UNDC (spec 006, depende de `backend/specs/006-borradores-edicion-dni-automatico`): un
   equipo de un salón o ciclo se guarda como **borrador** (`DRAFT`: «Guardar borrador», editar con `?teamId=`,
-  «Enviar» → `PENDING`, «Quitar»); después de enviarlo solo lo edita un administrador (`AdminTeamEditModal`). El
+  «Enviar» → `PENDING`, «Quitar»); después de enviarlo solo lo edita un administrador (`AdminTeamEditForm`, dentro del panel del equipo). El
   Tesorero nunca recibe borradores. Un estudiante tiene un solo salón o ciclo activo por evento (el servidor lo hace
   cumplir; la pantalla oculta el formulario con `isActiveGroup`). «Ver comprobante» **no** abre pestañas: usa
   `VoucherLink`/`VoucherViewerModal` (sobre `AppModal`, que queda por encima del menú lateral). La búsqueda de
@@ -100,6 +100,18 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
   cuando API UNDC está conectada y sigue siendo editable («Del padrón»). `UndcApiCard` (Integraciones): la API key va
   en un campo `password`, se envía una vez y nunca se guarda en cookies, `localStorage`, `sessionStorage`, stores ni
   consola; solo se muestra `keyMask`.
+- Revisión por salón o ciclo (spec 007, solo frontend): en `admin/inscripciones.vue` los equipos de un salón se muestran en
+  **desplegables** (`GroupAccordion`, contraídos al abrir y ordenados por urgencia con `groupAttention`), con el pago general
+  único y los equipos que cubre y, aparte, cada equipo adicional con su comprobante; los equipos que pagan por disciplina
+  siguen como tarjetas. La revisión usa **un solo modal con dos paneles** (`TeamReviewPane` = solo el equipo, con la edición
+  en el mismo panel; `PaymentReviewPane` = comprobante y equipos que cubre). Se cambia de panel («Ver pago →», «Ver equipo →»,
+  «← Volver al pago»); **nunca se apila otro modal** (tampoco para ampliar el comprobante: `VoucherImage`). El estado del modal
+  vive en el historial (`?revision=N`): «Atrás» del navegador y el botón ← de `AppModal` (`back-label`) vuelven al panel anterior y,
+  desde el primero, cierran el modal sin sacar al usuario de la pantalla; cerrar retira todas las entradas. Cada dato vive en un
+  solo lugar: delegado, ciclo/sección y caja del salón en la cabecera del desplegable; monto, N.º de operación e imagen en el
+  panel de pago; jugadores y reglas en el panel del equipo. La caja de un salón suma cada voucher **una sola vez**. El filtro
+  de pago de la lista usa `needsVoucher` en el cliente (no `?isPaid=`, que ignora los equipos que pagan por salón). El Tesorero
+  no edita ni aprueba/rechaza equipos: solo valida o rechaza comprobantes.
 - Tokens de integración por evento (`admin/eventos.vue` → "Tokens API"): el
   valor completo `dfi_…` solo se muestra una vez tras crearlo; nunca guardarlo
   en cookies, `localStorage`, stores ni consola.
@@ -220,7 +232,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`), `006-borradores-comprobante-dni` (depende de `backend/specs/006-borradores-edicion-dni-automatico`).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`), `006-borradores-comprobante-dni` (depende de `backend/specs/006-borradores-edicion-dni-automatico`), `007-revision-por-salon` (solo frontend; no cambia ningún contrato del backend).
 
 ## Antes de dar por terminado
 
