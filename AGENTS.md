@@ -68,6 +68,14 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
   agregar) — aplica en `inscripcion/[id].vue` y `admin/inscripciones.vue`.
 - En el panel admin, respetar permisos: `admin.ts` exige rol OWNER/ADMIN; en
   usuarios, un admin no edita admins/owners y nadie se inhabilita a sí mismo.
+- `admin/usuarios.vue` filtra y pagina **en el cliente** (`GET /users` devuelve todos): búsqueda, rol, estado, acceso,
+  facultad y escuela, con `PaginationBar` y `utils/pagination.ts`. La vista vive en la URL (`?q=&rol=&estado=&acceso=&facultad=&escuela=&pagina=&por=`)
+  con `router.replace`, así que recargar o compartir el enlace conserva filtros y página. Si el número de usuarios crece
+  mucho, el paso siguiente es paginar en el servidor (cambio de contrato: empieza en el backend).
+- Textos con formato (`RichTextEditor`, `utils/richText.ts`): el máximo es `RICH_TEXT_MAX_BYTES` (60 000 bytes UTF-8, igual que el
+  backend; las columnas `TEXT` admiten 65 535). El editor muestra un contador y los formularios (`admin/disciplinas`) validan
+  antes de enviar. StarterKit de TipTap 3 ya incluye `Link` y `Underline`: se configuran con `StarterKit.configure({ link })`;
+  no los vuelvas a declarar como extensiones (aviso «Duplicate extension names»).
 - Disciplinas pagadas (`isPaid`) requieren voucher en la inscripción.
 - Roles del panel (spec 004): `OWNER_SYSTEM` y `ADMIN_SYSTEM` gestionan todo (solo el Owner asigna Administrador u
   Owner); `TREASURER` (Tesorero) solo ve y valida pagos: entra a `/admin/dashboard`, `/admin/inscripciones` y
