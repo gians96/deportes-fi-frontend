@@ -37,6 +37,11 @@ const map: Record<string, { label: string; classes: string; dot: string }> = {
     classes: 'bg-sky-500/10 text-sky-300 border border-sky-500/20',
     dot: 'bg-sky-400',
   },
+  OBSERVED: {
+    label: 'Observado',
+    classes: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
+    dot: 'bg-orange-400',
+  },
   CANCELLED: {
     label: 'Cancelado',
     classes: 'bg-oscuro-600/40 text-oscuro-200 border border-oscuro-600',

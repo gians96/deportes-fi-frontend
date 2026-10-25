@@ -26,6 +26,9 @@
             {{ plural(counts.total, 'equipo', 'equipos') }} ·
             {{ plural(counts.approved, 'aprobado', 'aprobados') }} ·
             {{ plural(counts.pending, 'pendiente', 'pendientes') }}
+            <template v-if="counts.observed">
+              · <span class="text-orange-300">{{ plural(counts.observed, 'observado', 'observados') }}</span>
+            </template>
           </span>
         </div>
         <p class="mt-1.5 text-xs text-oscuro-300">
@@ -196,6 +199,7 @@ const counts = computed(() => {
     total: sent.length,
     approved: sent.filter((row) => row.status === 'APPROVED').length,
     pending: sent.filter((row) => row.status === 'PENDING').length,
+    observed: sent.filter((row) => row.status === 'OBSERVED').length,
   }
 })
 
@@ -214,6 +218,7 @@ const money = computed(() => {
 const ATTENTION: Record<GroupAttention, { classes: string; dot: string }> = {
   PENDING: { classes: 'border-yellow-500/25 bg-yellow-500/10 text-yellow-300', dot: 'bg-yellow-400' },
   REJECTED: { classes: 'border-red-500/25 bg-red-500/10 text-red-300', dot: 'bg-red-400' },
+  OBSERVED: { classes: 'border-orange-500/25 bg-orange-500/10 text-orange-300', dot: 'bg-orange-400' },
   DRAFT: { classes: 'border-sky-500/25 bg-sky-500/10 text-sky-300', dot: 'bg-sky-400' },
   OK: { classes: 'border-green-500/25 bg-green-500/10 text-green-300', dot: 'bg-green-400' },
 }
@@ -223,6 +228,7 @@ const attentionView = computed(() => {
   const label = {
     PENDING: counts.value.pending ? `${counts.value.pending} por revisar` : 'Pago por validar',
     REJECTED: 'Pago rechazado',
+    OBSERVED: 'Esperando al delegado',
     DRAFT: 'Solo borradores',
     OK: 'Al día',
   }[kind]

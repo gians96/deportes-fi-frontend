@@ -15,6 +15,14 @@
       </NuxtLink>
     </div>
 
+    <p
+      v-if="notice"
+      class="mt-4 flex items-start justify-between gap-3 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-200"
+    >
+      <span>{{ notice }}</span>
+      <button type="button" class="shrink-0 text-xs font-semibold underline" @click="notice = ''">Cerrar</button>
+    </p>
+
     <div class="mt-5 flex flex-wrap gap-2">
       <button
         v-for="option in statusFilters"
@@ -147,6 +155,22 @@
           {{ team.rejectionReason }}
         </p>
 
+        <div
+          v-if="team.status === 'OBSERVED'"
+          class="mb-4 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200"
+        >
+          <p class="font-semibold">El administrador observó tu inscripción</p>
+          <p v-if="team.observation" class="mt-1">{{ team.observation }}</p>
+          <button
+            v-if="canCorrect(team)"
+            type="button"
+            class="mt-2 rounded-lg bg-orange-500/20 px-3 py-1.5 font-semibold text-orange-100 hover:bg-orange-500/30"
+            @click="openCorrect(team)"
+          >
+            Corregir y reenviar
+          </button>
+        </div>
+
         <NuxtLink
           v-if="paysByGroup(team) && team.discipline?.event?.id && team.delegate?.id === auth.user?.id"
           :to="`/inscripcion/grupo/${team.discipline.event.id}`"
@@ -262,7 +286,30 @@
         >
           Motivo de rechazo: {{ detailTeam.rejectionReason }}
         </p>
+        <p
+          v-if="detailTeam.status === 'OBSERVED'"
+          class="rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-orange-200"
+        >
+          Observación del administrador<template v-if="detailTeam.observation">: {{ detailTeam.observation }}</template>
+        </p>
       </div>
+    </AppModal>
+
+    <!-- Corrección del delegado: edita y reenvía un equipo observado (sin plazo) -->
+    <AppModal
+      v-model="correctOpen"
+      :title="correctTeam ? `Corregir «${correctTeam.name}»` : 'Corregir inscripción'"
+      size="4xl"
+    >
+      <TeamEditForm
+        v-if="correctTeam"
+        :key="correctTeam.id"
+        :team="correctTeam"
+        resubmit
+        @saved="onCorrected"
+        @refresh="loadTeams"
+        @cancel="correctOpen = false"
+      />
     </AppModal>
   </div>
 </template>
@@ -287,10 +334,14 @@ const eventFilter = ref(0)
 const disciplineFilter = ref(0)
 const detailOpen = ref(false)
 const detailTeam = ref<Team | null>(null)
+const correctOpen = ref(false)
+const correctTeam = ref<Team | null>(null)
+const notice = ref('')
 
 const statusFilters: { label: string; value: RegistrationStatus | 'ALL' }[] = [
   { label: 'Todos', value: 'ALL' },
   { label: 'Pendientes', value: 'PENDING' },
+  { label: 'Observados', value: 'OBSERVED' },
   { label: 'Aprobados', value: 'APPROVED' },
   { label: 'Rechazados', value: 'REJECTED' },
 ]
@@ -361,13 +412,34 @@ function openDetail(team: Team) {
   detailOpen.value = true
 }
 
-onMounted(async () => {
+/** Solo el delegado del equipo corrige un equipo observado (el servidor también lo exige). */
+function canCorrect(team: Team) {
+  return team.delegate?.id === auth.user?.id
+}
+
+function openCorrect(team: Team) {
+  correctTeam.value = team
+  correctOpen.value = true
+}
+
+async function loadTeams() {
   try {
     teams.value = await api.get<Team[]>('/registrations/mine')
   } catch {
     teams.value = []
   }
-})
+}
+
+async function onCorrected(resubmitted: boolean) {
+  const name = correctTeam.value?.name ?? 'El equipo'
+  correctOpen.value = false
+  notice.value = resubmitted
+    ? `«${name}» se reenvió: el administrador lo revisará de nuevo.`
+    : `Cambios de «${name}» guardados. Sigue observado hasta que lo reenvíes.`
+  await loadTeams()
+}
+
+onMounted(loadTeams)
 </script>
 
 <style scoped>

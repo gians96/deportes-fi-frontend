@@ -35,7 +35,9 @@ export function slotLabel(slot: number | null | undefined): string {
 export function isActiveGroup(group: Pick<ClassGroup, 'baseVoucher' | 'disciplines'>): boolean {
   if (group.baseVoucher?.status !== 'REJECTED') return true
   return group.disciplines.some((discipline) =>
-    discipline.teams.some((team) => team.status === 'PENDING' || team.status === 'APPROVED'),
+    discipline.teams.some(
+      (team) => team.status === 'PENDING' || team.status === 'OBSERVED' || team.status === 'APPROVED',
+    ),
   )
 }
 
@@ -76,19 +78,20 @@ export function coverageOf(
   return extra ? { voucher: extra, label: 'Equipo adicional' } : null
 }
 
-export type GroupAttention = 'PENDING' | 'REJECTED' | 'DRAFT' | 'OK'
+export type GroupAttention = 'PENDING' | 'REJECTED' | 'OBSERVED' | 'DRAFT' | 'OK'
 
 /** Orden de la lista de salones: primero lo que pide una acción del administrador. */
 export const ATTENTION_ORDER: Record<GroupAttention, number> = {
   PENDING: 0,
   REJECTED: 1,
-  DRAFT: 2,
-  OK: 3,
+  OBSERVED: 2,
+  DRAFT: 3,
+  OK: 4,
 }
 
 /**
- * Qué necesita un salón o ciclo: algo por revisar (equipo o pago pendiente), un pago rechazado (espera al
- * delegado), solo borradores sin enviar, o nada (al día). Ordena la lista y da el aviso de la cabecera.
+ * Qué necesita un salón o ciclo: algo por revisar (equipo o pago pendiente), un pago rechazado o un equipo
+ * observado (esperan al delegado), solo borradores sin enviar, o nada (al día). Ordena la lista y da el aviso de la cabecera.
  */
 export function groupAttention(
   group: Pick<ClassGroup, 'baseVoucher' | 'extraVouchers' | 'disciplines'>,
@@ -101,6 +104,7 @@ export function groupAttention(
     return 'PENDING'
   }
   if (vouchers.some((voucher) => voucher.status === 'REJECTED')) return 'REJECTED'
+  if (teams.some((team) => team.status === 'OBSERVED')) return 'OBSERVED'
   if (teams.some((team) => team.status === 'DRAFT')) return 'DRAFT'
   return 'OK'
 }

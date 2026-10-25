@@ -124,6 +124,21 @@
                     Motivo: {{ team.rejectionReason }}
                   </p>
                   <div
+                    v-if="team.status === 'OBSERVED'"
+                    class="mt-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200"
+                  >
+                    <p class="font-semibold">El administrador observó este equipo</p>
+                    <p v-if="team.observation" class="mt-1">{{ team.observation }}</p>
+                    <button
+                      type="button"
+                      class="mt-2 rounded-lg bg-orange-500/20 px-3 py-1.5 font-semibold text-orange-100 hover:bg-orange-500/30 disabled:opacity-50"
+                      :disabled="busyTeamId === team.id"
+                      @click="openCorrect(team.id)"
+                    >
+                      Corregir y reenviar
+                    </button>
+                  </div>
+                  <div
                     v-if="team.status === 'DRAFT' && event.isOpen"
                     class="mt-2 flex flex-wrap items-center gap-2"
                   >
@@ -248,6 +263,23 @@
       </section>
     </template>
 
+    <!-- Corrección de un equipo observado: se edita y se reenvía sin plazo -->
+    <AppModal
+      v-model="correctOpen"
+      :title="correctTeam ? `Corregir «${correctTeam.name}»` : 'Corregir equipo'"
+      size="4xl"
+    >
+      <TeamEditForm
+        v-if="correctTeam"
+        :key="correctTeam.id"
+        :team="correctTeam"
+        resubmit
+        @saved="onCorrected"
+        @refresh="loadGroups"
+        @cancel="correctOpen = false"
+      />
+    </AppModal>
+
     <AppConfirm
       v-model="removeOpen"
       title="Quitar borrador"
@@ -262,7 +294,7 @@
 
 <script setup lang="ts">
 import { ChevronLeft } from 'lucide-vue-next'
-import type { ClassGroup, EventPricing, GroupScope, SportEvent } from '~/types/domain'
+import type { ClassGroup, EventPricing, GroupScope, SportEvent, Team } from '~/types/domain'
 import { formatCurrency } from '~/utils/format'
 import {
   activeTeams,
@@ -305,6 +337,8 @@ const createSuccess = ref('')
 const actionError = ref('')
 
 const busyTeamId = ref(0)
+const correctOpen = ref(false)
+const correctTeam = ref<Team | null>(null)
 const removeOpen = ref(false)
 const removeId = ref(0)
 const removeName = ref('')
@@ -353,6 +387,34 @@ async function loadGroups() {
   } catch {
     groups.value = []
   }
+}
+
+/** Carga el equipo observado completo (con su nómina) y abre el editor de corrección. */
+async function openCorrect(teamId: number) {
+  actionError.value = ''
+  busyTeamId.value = teamId
+  try {
+    const mine = await api.get<Team[]>('/registrations/mine')
+    const team = mine.find((item) => item.id === teamId)
+    if (!team) {
+      actionError.value = 'No se encontró ese equipo en tus inscripciones. Pide ayuda a un administrador.'
+      return
+    }
+    correctTeam.value = team
+    correctOpen.value = true
+  } catch (err) {
+    actionError.value = apiMessage(err, 'No se pudo abrir el equipo.')
+  } finally {
+    busyTeamId.value = 0
+  }
+}
+
+async function onCorrected(resubmitted: boolean) {
+  correctOpen.value = false
+  createSuccess.value = resubmitted
+    ? 'Equipo reenviado: el administrador lo revisará de nuevo.'
+    : 'Cambios guardados. El equipo sigue observado hasta que lo reenvíes.'
+  await loadGroups()
 }
 
 async function submitTeam(teamId: number) {

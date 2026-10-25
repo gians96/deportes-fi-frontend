@@ -24,11 +24,14 @@
       </div>
     </div>
 
-    <AdminTeamEditForm
+    <TeamEditForm
       v-if="editing"
       class="mt-4"
       :team="team"
+      admin-mode
+      :delegate-options="delegateOptions"
       @saved="onSaved"
+      @refresh="emit('saved')"
       @cancel="editing = false"
     />
 
@@ -111,6 +114,14 @@
           >
             Inscripción rechazada: {{ team.rejectionReason }}
           </p>
+          <p
+            v-if="team.status === 'OBSERVED'"
+            class="rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-orange-200"
+          >
+            Observado, a la espera de que el delegado lo corrija y lo reenvíe<template v-if="team.observation">:
+              {{ team.observation }}</template
+            >
+          </p>
         </div>
 
         <div v-if="ownVoucher" class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -140,8 +151,121 @@
           <p v-else class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
             Este equipo de pago no tiene voucher adjunto.
           </p>
+          <VoucherAdminActions
+            v-if="isAdmin && team.voucher"
+            class="mt-4 border-t border-amber-500/20 pt-3"
+            :voucher="team.voucher"
+            :busy="busy"
+            @reopen="team.voucher && emit('reopen-voucher', team.voucher.id)"
+            @edit="team.voucher && emit('edit-voucher', team.voucher.id, $event)"
+          />
         </div>
       </div>
+
+      <!-- Administración: corregir el estado, devolver al delegado o eliminar, en cualquier estado -->
+      <section
+        v-if="isAdmin"
+        class="mt-4 space-y-3 rounded-2xl border border-oscuro-700 bg-oscuro-900/40 p-4"
+        aria-label="Administración de la inscripción"
+      >
+        <h3 class="text-sm font-bold text-white">Administración</h3>
+
+        <template v-if="team.status !== 'DRAFT'">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="team.status !== 'PENDING'"
+              type="button"
+              class="rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-50"
+              :disabled="busy"
+              @click="emit('change-status', 'PENDING', '')"
+            >
+              Volver a pendiente
+            </button>
+            <button
+              v-if="team.status !== 'OBSERVED'"
+              type="button"
+              class="rounded-lg bg-orange-500/15 px-3 py-1.5 text-xs font-semibold text-orange-300 hover:bg-orange-500/25 disabled:opacity-50"
+              :disabled="busy"
+              @click="askObservation"
+            >
+              Marcar observado
+            </button>
+            <span class="text-xs text-oscuro-300">
+              «Observado» devuelve el equipo al delegado para que lo corrija; conserva su cupo y su pago.
+            </span>
+          </div>
+
+          <div class="grid gap-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+            <select v-model="targetStatus" class="field" aria-label="Cambiar a otro estado">
+              <option value="">Cambiar estado a…</option>
+              <option v-for="option in statusOptions" :key="option" :value="option">
+                {{ STATUS_LABEL[option] }}
+              </option>
+            </select>
+            <input
+              v-if="needsReason"
+              ref="reasonInput"
+              v-model="statusReason"
+              :placeholder="
+                targetStatus === 'OBSERVED' ? 'Observación para el delegado (obligatoria)' : 'Motivo del rechazo (obligatorio)'
+              "
+              maxlength="500"
+              class="field min-w-0"
+            />
+            <span v-else class="hidden sm:block" />
+            <button
+              type="button"
+              class="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-oscuro-900 hover:bg-green-400 disabled:opacity-50"
+              :disabled="busy || !canApplyStatus"
+              @click="applyStatus"
+            >
+              Aplicar
+            </button>
+          </div>
+          <p v-if="targetStatus === 'APPROVED'" class="text-xs text-oscuro-300">
+            Para aprobar el equipo debe cumplir las bases y su comprobante debe estar validado.
+          </p>
+          <p v-if="targetStatus === 'REJECTED' || targetStatus === 'CANCELLED'" class="text-xs text-oscuro-300">
+            Libera el cupo del equipo en su salón o ciclo; al restaurarlo se vuelve a tomar si sigue libre.
+          </p>
+        </template>
+
+        <div class="border-t border-oscuro-700 pt-3">
+          <button
+            v-if="!confirmingDelete"
+            type="button"
+            class="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+            :disabled="busy"
+            @click="confirmingDelete = true"
+          >
+            Eliminar inscripción
+          </button>
+          <div v-else class="rounded-xl border border-red-500/30 bg-red-500/5 p-3">
+            <p class="text-sm text-red-200">
+              ¿Eliminar definitivamente «{{ team.name }}» ({{ STATUS_LABEL[team.status] ?? team.status }})? Se borran sus
+              jugadores y se libera su cupo. No se puede deshacer.
+            </p>
+            <div class="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg px-3 py-1.5 text-xs font-semibold text-oscuro-200 hover:bg-oscuro-700"
+                :disabled="busy"
+                @click="confirmingDelete = false"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-red-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-50"
+                :disabled="busy"
+                @click="emit('delete')"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Acciones: Owner/Administrador deciden sobre el equipo; el Tesorero solo valida o rechaza comprobantes -->
       <div
@@ -256,7 +380,14 @@
 
 <script setup lang="ts">
 import { AlertTriangle, CheckCircle2 } from 'lucide-vue-next'
-import type { ClassGroup, GroupVoucher, Team, VoucherStatus } from '~/types/domain'
+import type {
+  AuthUser,
+  ClassGroup,
+  GroupVoucher,
+  RegistrationStatus,
+  Team,
+  VoucherStatus,
+} from '~/types/domain'
 import { formatCurrency } from '~/utils/format'
 import { scopeLabel } from '~/utils/groups'
 
@@ -279,6 +410,8 @@ const props = defineProps<{
   isAdmin: boolean
   isTreasurer: boolean
   busy: boolean
+  /** Candidatos a delegado para el editor del administrador. */
+  delegateOptions?: Pick<AuthUser, 'id' | 'fullName' | 'email'>[]
 }>()
 
 const emit = defineEmits<{
@@ -288,10 +421,59 @@ const emit = defineEmits<{
   'validate-voucher': []
   'reject-voucher': [reason: string]
   'view-payment': []
+  'change-status': [status: ManualStatus, reason: string]
+  delete: []
+  'reopen-voucher': [voucherId: number]
+  'edit-voucher': [voucherId: number, data: { operationNumber: string; amount: number }]
 }>()
 
 const editing = ref(false)
 const reason = ref('')
+
+/** Estados a los que el administrador puede llevar un equipo a mano (el borrador no es un destino). */
+type ManualStatus = Exclude<RegistrationStatus, 'DRAFT'>
+const MANUAL_STATUSES: ManualStatus[] = ['PENDING', 'APPROVED', 'REJECTED', 'OBSERVED', 'CANCELLED']
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Pendiente',
+  APPROVED: 'Aprobado',
+  REJECTED: 'Rechazado',
+  OBSERVED: 'Observado',
+  CANCELLED: 'Cancelado',
+  DRAFT: 'Borrador',
+}
+
+const targetStatus = ref<ManualStatus | ''>('')
+const statusReason = ref('')
+const confirmingDelete = ref(false)
+const reasonInput = ref<HTMLInputElement | null>(null)
+
+const statusOptions = computed(() => MANUAL_STATUSES.filter((status) => status !== props.team.status))
+const needsReason = computed(() => targetStatus.value === 'REJECTED' || targetStatus.value === 'OBSERVED')
+const canApplyStatus = computed(
+  () => !!targetStatus.value && (!needsReason.value || !!statusReason.value.trim()),
+)
+
+// Al cambiar de equipo o de estado, el panel parte limpio.
+watch(
+  () => [props.team.id, props.team.status],
+  () => {
+    targetStatus.value = ''
+    statusReason.value = ''
+    confirmingDelete.value = false
+  },
+)
+
+function applyStatus() {
+  if (!targetStatus.value || !canApplyStatus.value) return
+  emit('change-status', targetStatus.value, needsReason.value ? statusReason.value.trim() : '')
+}
+
+/** «Marcar observado» pide primero el texto que verá el delegado. */
+async function askObservation() {
+  targetStatus.value = 'OBSERVED'
+  await nextTick()
+  reasonInput.value?.focus()
+}
 
 /** Solo un equipo que paga por disciplina muestra su comprobante aquí; el de un salón se revisa en «Ver pago». */
 const ownVoucher = computed(() => !props.group && props.paid)
@@ -317,3 +499,20 @@ function onSaved() {
   emit('saved')
 }
 </script>
+
+<style scoped>
+.field {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(55, 65, 81, 0.4);
+  background-color: #182029;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: white;
+  outline: none;
+}
+.field:focus {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.4);
+}
+</style>

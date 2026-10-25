@@ -103,6 +103,10 @@
             <p class="text-lg font-bold text-yellow-300">{{ teamCount(group, 'PENDING') }}</p>
             pendientes
           </div>
+          <div v-if="teamCount(group, 'OBSERVED')">
+            <p class="text-lg font-bold text-orange-300">{{ teamCount(group, 'OBSERVED') }}</p>
+            observados
+          </div>
           <div v-if="teamCount(group, 'DRAFT')">
             <p class="text-lg font-bold text-sky-300">{{ teamCount(group, 'DRAFT') }}</p>
             borradores

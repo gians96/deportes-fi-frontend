@@ -125,6 +125,16 @@
         </button>
       </div>
       <p v-else class="text-sm text-oscuro-300">Comprobante rechazado: se espera que el delegado lo reenvíe.</p>
+
+      <!-- Owner y Administrador pueden deshacer un «validar»/«rechazar» equivocado y corregir los datos del pago -->
+      <VoucherAdminActions
+        v-if="isAdmin"
+        class="mt-3 border-t border-oscuro-700 pt-3"
+        :voucher="voucher"
+        :busy="busy"
+        @reopen="emit('reopen')"
+        @edit="emit('edit', $event)"
+      />
     </div>
   </div>
 </template>
@@ -147,9 +157,17 @@ const props = defineProps<{
   playersOf: (team: Team) => number
   rulesOf: (team: Team) => { ok: boolean; messages: string[] }
   busy: boolean
+  /** Owner o Administrador: puede reabrir el comprobante y corregir sus datos. */
+  isAdmin?: boolean
 }>()
 
-const emit = defineEmits<{ validate: []; reject: [reason: string]; 'view-team': [team: Team] }>()
+const emit = defineEmits<{
+  validate: []
+  reject: [reason: string]
+  'view-team': [team: Team]
+  reopen: []
+  edit: [data: { operationNumber: string; amount: number }]
+}>()
 
 const reason = ref('')
 

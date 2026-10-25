@@ -25,6 +25,8 @@ export type RegistrationStatus =
   | 'CANCELLED'
   /** Equipo guardado y aún no enviado (solo salón o ciclo): el tesorero no lo ve. */
   | 'DRAFT'
+  /** Devuelto al delegado con una observación: lo corrige y lo reenvía; conserva su cupo y su pago. */
+  | 'OBSERVED'
 
 export type VoucherStatus = 'PENDING' | 'VALIDATED' | 'REJECTED'
 
@@ -194,6 +196,8 @@ export interface Team {
   phone?: string | null
   status: RegistrationStatus
   rejectionReason?: string | null
+  /** Observación del administrador (solo si está `OBSERVED`). */
+  observation?: string | null
   participants: Participant[]
   voucher?: Voucher | null
   /** Salón o ciclo que paga el equipo (null en el flujo por disciplina). */
@@ -370,6 +374,8 @@ export interface GroupTeam {
   status: RegistrationStatus
   /** Motivo con el que se rechazó el equipo (solo si está `REJECTED`). */
   rejectionReason?: string | null
+  /** Observación del administrador (solo si está `OBSERVED`). */
+  observation?: string | null
   voucherId: number | null
 }
 

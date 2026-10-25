@@ -319,12 +319,17 @@
         :is-admin="auth.isAdmin"
         :is-treasurer="auth.isTreasurer"
         :busy="busy"
+        :delegate-options="reviewDelegateOptions"
         @saved="onTeamEdited"
         @approve="approveReview"
         @reject="rejectReview"
         @validate-voucher="validateTeamVoucher"
         @reject-voucher="rejectTeamVoucher"
         @view-payment="goToPayment"
+        @change-status="changeStatus"
+        @delete="deleteReview"
+        @reopen-voucher="reopenVoucher"
+        @edit-voucher="editVoucher"
       />
       <PaymentReviewPane
         v-else-if="review?.view === 'payment' && paymentContext"
@@ -335,9 +340,12 @@
         :players-of="countedPlayers"
         :rules-of="rulesCheck"
         :busy="busy"
+        :is-admin="auth.isAdmin"
         @validate="validateGroupPayment"
         @reject="rejectGroupPayment"
         @view-team="viewTeamFromPayment"
+        @reopen="reopenVoucher(paymentContext!.voucher.id)"
+        @edit="(data) => editVoucher(paymentContext!.voucher.id, data)"
       />
     </AppModal>
 
@@ -557,6 +565,7 @@ watch(
 
 const filters = computed<{ label: string; value: RegistrationStatus | 'ALL' }[]>(() => [
   { label: 'Pendientes', value: 'PENDING' },
+  { label: 'Observados', value: 'OBSERVED' },
   { label: 'Aprobados', value: 'APPROVED' },
   { label: 'Rechazados', value: 'REJECTED' },
   // El Tesorero no recibe borradores: el filtro solo tiene sentido para Owner y Administrador.
@@ -930,6 +939,54 @@ function rejectReview(reason: string) {
   }, `No se pudo rechazar el equipo «${team.name}».`)
 }
 
+const STATUS_LABEL: Record<RegistrationStatus, string> = {
+  PENDING: 'pendiente',
+  APPROVED: 'aprobado',
+  REJECTED: 'rechazado',
+  OBSERVED: 'observado',
+  CANCELLED: 'cancelado',
+  DRAFT: 'borrador',
+}
+
+/** Corrección manual del estado (Owner/Administrador): deshacer un «aprobar», observar, restaurar, cancelar. */
+function changeStatus(status: RegistrationStatus, reason: string) {
+  const team = reviewTeam.value
+  if (!team) return
+  return run(async () => {
+    await api.patch(`/registrations/${team.id}/status`, { status, ...(reason ? { reason } : {}) })
+    finishAction(`Equipo «${team.name}»: ahora está ${STATUS_LABEL[status]}.`)
+    await loadTeams()
+  }, `No se pudo cambiar el estado del equipo «${team.name}».`)
+}
+
+/** Borrado definitivo (la confirmación vive en el panel del equipo). */
+function deleteReview() {
+  const team = reviewTeam.value
+  if (!team) return
+  return run(async () => {
+    await api.del(`/registrations/${team.id}`)
+    finishAction(`Equipo «${team.name}» eliminado.`)
+    await loadTeams()
+  }, `No se pudo eliminar el equipo «${team.name}».`)
+}
+
+/** Deshace un «validar» o «rechazar» equivocado del comprobante; los equipos aprobados con él vuelven a pendiente. */
+function reopenVoucher(voucherId: number) {
+  return run(async () => {
+    await api.patch(`/vouchers/${voucherId}/reopen`, {})
+    finishAction('Comprobante devuelto a pendiente; los equipos que se aprobaron con él también.')
+    await loadTeams()
+  }, 'No se pudo devolver el comprobante a pendiente.')
+}
+
+/** Corrige a mano el N.° de operación y el monto; el panel sigue abierto con los datos nuevos. */
+function editVoucher(voucherId: number, data: { operationNumber: string; amount: number }) {
+  return run(async () => {
+    await api.patch(`/vouchers/${voucherId}`, data)
+    await loadTeams()
+  }, 'No se pudo corregir el comprobante.')
+}
+
 /** Voucher propio de un equipo que paga por disciplina. */
 function validateTeamVoucher() {
   const team = reviewTeam.value
@@ -1027,12 +1084,19 @@ const participantMode = computed<'STUDENT' | 'OTHER'>(
   () => selectedDiscipline.value?.participantType ?? 'STUDENT',
 )
 
-const delegateOptions = computed(() =>
-  users.value.filter((user) => {
+function delegateCandidates(mode: 'STUDENT' | 'OTHER') {
+  return users.value.filter((user) => {
     const isStudent = user.role === 'STUDENT' || Boolean(user.studentCode || /^\d+@/.test(user.email))
     const isOther = user.role === 'OTHER' || (!isStudent && user.role !== 'ADMIN_SYSTEM' && user.role !== 'OWNER_SYSTEM')
-    return participantMode.value === 'STUDENT' ? isStudent || isOther : isOther
-  }),
+    return mode === 'STUDENT' ? isStudent || isOther : isOther
+  })
+}
+
+const delegateOptions = computed(() => delegateCandidates(participantMode.value))
+
+/** Candidatos a delegado al editar el equipo que se está revisando (según su tipo de participante). */
+const reviewDelegateOptions = computed(() =>
+  delegateCandidates(reviewTeam.value?.discipline?.participantType ?? 'STUDENT'),
 )
 
 watch(
