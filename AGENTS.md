@@ -100,7 +100,7 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
   del grupo (`paysByGroup` en `utils/groups.ts`), no por `discipline.isPaid`.
 - Borradores, comprobante y API UNDC (spec 006, depende de `backend/specs/006-borradores-edicion-dni-automatico`): un
   equipo de un salón o ciclo se guarda como **borrador** (`DRAFT`: «Guardar borrador», editar con `?teamId=`,
-  «Enviar» → `PENDING`, «Quitar»); después de enviarlo solo lo edita un administrador (`AdminTeamEditForm`, dentro del panel del equipo). El
+  «Enviar» → `PENDING`, «Quitar»); después de enviarlo solo lo edita un administrador (`TeamEditForm` en modo administrador, dentro del panel del equipo). El
   Tesorero nunca recibe borradores. Un estudiante tiene un solo salón o ciclo activo por evento (el servidor lo hace
   cumplir; la pantalla oculta el formulario con `isActiveGroup`). «Ver comprobante» **no** abre pestañas: usa
   `VoucherLink`/`VoucherViewerModal` (sobre `AppModal`, que queda por encima del menú lateral). La búsqueda de
@@ -120,6 +120,19 @@ No llama a otros sistemas: solo a su backend y a Google Identity.
   panel de pago; jugadores y reglas en el panel del equipo. La caja de un salón suma cada voucher **una sola vez**. El filtro
   de pago de la lista usa `needsVoucher` en el cliente (no `?isPaid=`, que ignora los equipos que pagan por salón). El Tesorero
   no edita ni aprueba/rechaza equipos: solo valida o rechaza comprobantes.
+- Edición manual y estado Observado (spec 008, depende de `backend/specs/007-edicion-manual-inscripciones`): en
+  `admin/inscripciones.vue`, el panel del equipo (`TeamReviewPane`) trae una sección **Administración** para Owner y
+  Administrador **en cualquier estado**: «Volver a pendiente», «Marcar observado» (pide el texto que verá el delegado),
+  «Cambiar estado a…» (`PATCH /registrations/:id/status`; Rechazado y Observado exigen motivo) y «Eliminar inscripción»
+  (confirmación **dentro del panel**, nunca otro modal; `DELETE /registrations/:id`). `VoucherAdminActions` (en el panel del
+  equipo con voucher propio y en `PaymentReviewPane`) deshace un «validar»/«rechazar» (`PATCH /vouchers/:id/reopen`) y corrige
+  N.° de operación y monto (`PATCH /vouchers/:id`). `TeamEditForm` (antes `AdminTeamEditForm`) es el único editor de equipos:
+  `adminMode` suma delegado, ciclo/sección (solo equipos fuera de un salón) y nombre, código, DNI y género de cada jugador;
+  `resubmit` es el del **delegado** de un equipo `OBSERVED` («Guardar y reenviar» → `PATCH` + `POST :id/submit`, sin plazo).
+  `OBSERVED` se ve en `StatusBadge`, en la pestaña «Observados» del panel y de «Mis inscripciones» y en el hub del salón
+  (`estado-inscripcion.vue`, `inscripcion/grupo/[eventId].vue`), siempre con la observación (`Team.observation`). Cuenta como
+  equipo vivo en `isActiveGroup`; en `groupAttention` es «Esperando al delegado». El servidor decide los permisos: el Tesorero
+  no ve estas acciones.
 - Tokens de integración por evento (`admin/eventos.vue` → "Tokens API"): el
   valor completo `dfi_…` solo se muestra una vez tras crearlo; nunca guardarlo
   en cookies, `localStorage`, stores ni consola.
@@ -240,7 +253,7 @@ toques archivos de la carpeta padre `deportes-fi/`.
 - En Claude Code: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` (`/speckit-converge` agrega lo que falte). Los scripts
   están en `.specify/scripts/powershell/`.
-- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`), `006-borradores-comprobante-dni` (depende de `backend/specs/006-borradores-edicion-dni-automatico`), `007-revision-por-salon` (solo frontend; no cambia ningún contrato del backend).
+- Specs: `001-gestion-tokens-evento` (depende de `backend/specs/001-tokens-api-por-evento`), `002-pago-por-grupo` (depende de `backend/specs/002-pago-por-grupo`), `003-proveedores-dni` (reemplazada por la 005), `004-tesorero-y-acceso-por-contrasena` (depende de `backend/specs/004-tesorero-y-acceso-por-contrasena`), `005-pool-tokens-dni` (depende de `backend/specs/005-pool-tokens-dni`), `006-borradores-comprobante-dni` (depende de `backend/specs/006-borradores-edicion-dni-automatico`), `007-revision-por-salon` (solo frontend; no cambia ningún contrato del backend), `008-edicion-manual-inscripciones` (depende de `backend/specs/007-edicion-manual-inscripciones`).
 
 ## Antes de dar por terminado
 
